@@ -6,7 +6,9 @@ import (
 	"os"
 )
 
-var LoggerKey = "logger"
+type ctxKey struct{}
+
+var LoggerKey = ctxKey{}
 
 type LoggerConfig struct {
 	Level string

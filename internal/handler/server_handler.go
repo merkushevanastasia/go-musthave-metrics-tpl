@@ -19,7 +19,6 @@ var MetricTypePathKey = "metric_type"
 
 // HandleMetricUpdate хэндлер для обработки запроса на обновление значения метрики
 func HandleMetricUpdate(response http.ResponseWriter, request *http.Request) {
-
 	//Получаем логер с MDC
 	logger := utils.FromContext(request.Context())
 	logger.Info("Поступил запрос на обработку метрики...")
@@ -27,35 +26,40 @@ func HandleMetricUpdate(response http.ResponseWriter, request *http.Request) {
 	// Разрешен только Post-запрос
 	if request.Method != http.MethodPost {
 		handleError(response, servererror.ErrNotAllowedMethod, logger)
+		return
 	}
 
 	//Парсим тип метрики
 	metricType, err := parseMetricType(request)
 	if err != nil {
-		http.Error(response, err.Error(), http.StatusBadRequest)
+		handleError(response, err, logger)
+		return
 	}
 
 	metricName, err := parseMetricName(request)
 	if err != nil {
-		handleError(response, fmt.Errorf("%w %w", servererror.ErrNotValidMetricValue, err), logger)
+		handleError(response, fmt.Errorf("%w %w", servererror.ErrNotValidMetricName, err), logger)
+		return
 	}
 
 	switch metricType {
 	case dto.Gauge:
 		gaugeDto, err := createGaugeDto(request, metricName)
-		if err == nil {
-			service.ProcessGauge(request.Context(), gaugeDto)
 
+		if err != nil {
+			handleError(response, err, logger)
+			return
 		}
+		service.ProcessGauge(request.Context(), gaugeDto)
+
 	case dto.Counter:
 		counterDto, err := createCounterDto(request, metricName)
-		if err == nil {
-			service.ProcessCounter(request.Context(), counterDto)
-
+		if err != nil {
+			handleError(response, err, logger)
+			return
 		}
-	}
-	if err != nil {
-		handleError(response, err, logger)
+		service.ProcessCounter(request.Context(), counterDto)
+
 	}
 
 	logger.Info("Метрика успешно обработана")
@@ -79,6 +83,9 @@ func parseMetricType(request *http.Request) (dto.MetricType, error) {
 func createCounterDto(request *http.Request, metricName string) (dto.CounterMetricDto, error) {
 	metricValueStr := request.PathValue(MetricValuePathKey)
 	metricValue, err := strconv.ParseInt(metricValueStr, 10, 64)
+	if err != nil {
+		return dto.CounterMetricDto{}, fmt.Errorf("%w %w", servererror.ErrNotValidMetricValue, err)
+	}
 	return dto.CounterMetricDto{
 		Name:  metricName,
 		Value: metricValue,
