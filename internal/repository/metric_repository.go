@@ -28,11 +28,10 @@ func (MetricRepository) UpdateGauge(ctx context.Context, metricName string, valu
 	currentValue, isPresent := memStorage.Gauge[metricName]
 	if isPresent {
 		log.Debug(fmt.Sprintf("Метрика уже есть в системе. Значение метрики %s: %f. Обновляем на %f", metricName, currentValue, value))
-		memStorage.Gauge[metricName] = value
 	} else {
 		log.Debug(fmt.Sprintf("Ранее метрики не было. Создаем новую метрику со значением %s: %f", metricName, value))
-		memStorage.Gauge[metricName] = value
 	}
+	memStorage.Gauge[metricName] = value
 	log.Debug("Хранилище метрик послк обновления.", slog.Any("memStorage", memStorage))
 
 }
