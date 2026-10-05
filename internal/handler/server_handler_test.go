@@ -18,7 +18,7 @@ func TestHandleMetricUpdate(t *testing.T) {
 	}
 	type InputData struct {
 		PathVars map[string]string
-		Url      string
+		URL      string
 		Method   string
 	}
 
@@ -35,7 +35,7 @@ func TestHandleMetricUpdate(t *testing.T) {
 					MetricValuePathKey: "10",
 					MetricNamePathKey:  "NameMetric",
 				},
-				Url:    "/update/",
+				URL:    "/update/",
 				Method: http.MethodPost,
 			},
 			want: ExpectedData{
@@ -51,7 +51,7 @@ func TestHandleMetricUpdate(t *testing.T) {
 					MetricValuePathKey: "10",
 					MetricNamePathKey:  "NameMetric",
 				},
-				Url:    "/update/",
+				URL:    "/update/",
 				Method: http.MethodPost,
 			},
 			want: ExpectedData{
@@ -67,7 +67,7 @@ func TestHandleMetricUpdate(t *testing.T) {
 					MetricValuePathKey: "10",
 					MetricNamePathKey:  "",
 				},
-				Url:    "/update",
+				URL:    "/update",
 				Method: http.MethodPost,
 			},
 			want: ExpectedData{
@@ -82,7 +82,7 @@ func TestHandleMetricUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {})
 		{
 
-			request := httptest.NewRequest(tt.input.Method, tt.input.Url, nil)
+			request := httptest.NewRequest(tt.input.Method, tt.input.URL, nil)
 			for k, v := range tt.input.PathVars {
 				request.SetPathValue(k, v)
 			}

@@ -8,16 +8,16 @@ import (
 	"strconv"
 )
 
-func SendAll(values *CurrentMetricValues, baseUrl string) {
+func SendAll(values *CurrentMetricValues, baseURL string) {
 	slog.Info("Отправляем метрики на сервер...")
 	for metricName, metricValue := range values.GaugeMetrics {
-		err := send(baseUrl, "gauge", metricName, strconv.FormatFloat(metricValue, 'f', -1, 64))
+		err := send(baseURL, "gauge", metricName, strconv.FormatFloat(metricValue, 'f', -1, 64))
 		if err != nil {
 			slog.Error("Произошла ошибка", slog.Any("err", err))
 		}
 	}
 	for metricName, metricValue := range values.CounterMetrics {
-		err := send(baseUrl, "counter", metricName, strconv.FormatInt(metricValue, 10))
+		err := send(baseURL, "counter", metricName, strconv.FormatInt(metricValue, 10))
 		if err != nil {
 			slog.Error("Произошла ошибка", slog.Any("err", err))
 		}
@@ -33,6 +33,9 @@ func send(baseUrl string, metricType string, metricName string, metricValue stri
 	}
 
 	_, err = io.ReadAll(response.Body)
+	if err != nil {
+		slog.Error("Произошла ошибка при чтении ответа, но работа продолжается..")
+	}
 	err = response.Body.Close()
 	if err != nil {
 		slog.Error("Произошла ошибка при чтении ответа, но работа продолжается..")

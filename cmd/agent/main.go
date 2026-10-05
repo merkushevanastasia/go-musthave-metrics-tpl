@@ -14,7 +14,7 @@ import (
 
 var pollInterval = 2 * time.Second
 var reportInterval = 10 * time.Second
-var serverUrl = "http://localhost:8080"
+var serverURL = "http://localhost:8080"
 var level = "debug"
 
 func main() {
@@ -38,7 +38,7 @@ func main() {
 			case <-collectTicker.C:
 				agent.Update(values)
 			case <-sendTicker.C:
-				agent.SendAll(values, serverUrl)
+				agent.SendAll(values, serverURL)
 			case <-ctx.Done():
 				return
 			}
