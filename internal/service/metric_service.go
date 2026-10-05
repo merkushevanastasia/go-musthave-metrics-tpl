@@ -7,12 +7,20 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 )
 
-var metricRepository = repository.MetricRepository{}
-
-func ProcessGauge(ctx context.Context, dto dto.GaugeMetricDto) {
-	metricRepository.UpdateGauge(ctx, dto.Name, dto.Value)
+type MetricService struct {
+	repo repository.MetricRepository
 }
 
-func ProcessCounter(ctx context.Context, dto dto.CounterMetricDto) {
-	metricRepository.UpdateCounter(ctx, dto.Name, dto.Value)
+func NewMetricService(repo repository.MetricRepository) *MetricService {
+	return &MetricService{
+		repo: repo,
+	}
+}
+
+func (s *MetricService) ProcessGauge(ctx context.Context, dto dto.GaugeMetricDto) {
+	s.repo.UpdateGauge(ctx, dto.Name, dto.Value)
+}
+
+func (s *MetricService) ProcessCounter(ctx context.Context, dto dto.CounterMetricDto) {
+	s.repo.UpdateCounter(ctx, dto.Name, dto.Value)
 }
