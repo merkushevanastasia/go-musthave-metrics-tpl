@@ -19,7 +19,7 @@ func TestSendAllSuccess(t *testing.T) {
 
 	type args struct {
 		values        *CurrentMetricValues
-		baseUrl       string
+		baseURL       string
 		expectedPaths []string
 	}
 	tests := []struct {

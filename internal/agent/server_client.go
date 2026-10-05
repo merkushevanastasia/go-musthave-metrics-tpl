@@ -23,10 +23,10 @@ func SendAll(values *CurrentMetricValues, baseURL string) {
 		}
 	}
 }
-func send(baseUrl string, metricType string, metricName string, metricValue string) error {
+func send(baseURL string, metricType string, metricName string, metricValue string) error {
 	slog.Info("Отправляется ", slog.Any("Метрика", metricName))
 
-	fullPath := fmt.Sprintf("%s/update/%s/%s/%s", baseUrl, metricType, metricName, metricValue)
+	fullPath := fmt.Sprintf("%s/update/%s/%s/%s", baseURL, metricType, metricName, metricValue)
 	response, err := http.Post(fullPath, "text/plain", http.NoBody)
 	if err != nil {
 		return err
