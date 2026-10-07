@@ -12,6 +12,7 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
+	"github.com/gin-gonic/gin"
 )
 
 var MetricNamePathKey = "metric_name"
@@ -19,60 +20,158 @@ var MetricValuePathKey = "metric_value"
 var MetricTypePathKey = "metric_type"
 
 // HandleMetricUpdate хэндлер для обработки запроса на обновление значения метрики
-func HandleMetricUpdate(response http.ResponseWriter, request *http.Request) {
-
+func HandleMetricUpdate(c *gin.Context) {
 	repo := repository.MetricRepositoryImpl{}
 	metricService := service.NewMetricService(repo)
 
-	//Получаем логер с MDC
-	logger := utils.FromContext(request.Context())
+	// Получаем логгер из контекста Gin (ключ приведен к string, так как Gin использует строки в качестве ключей)
+	logger := utils.FromContext(c)
+
 	logger.Info("Поступил запрос на обработку метрики...")
 
-	// Разрешен только Post-запрос
-	if request.Method != http.MethodPost {
-		handleError(response, servererror.ErrNotAllowedMethod, logger)
+	// Парсим тип метрики
+	metricType, err := parseMetricType(c)
+	if err != nil {
+		handleError(c, err, logger)
 		return
 	}
 
-	//Парсим тип метрики
-	metricType, err := parseMetricType(request)
+	// Парсим имя метрики
+	metricName, err := parseMetricName(c)
 	if err != nil {
-		handleError(response, err, logger)
+		handleError(c, fmt.Errorf("%w %w", servererror.ErrNotValidMetricName, err), logger)
 		return
 	}
 
-	metricName, err := parseMetricName(request)
-	if err != nil {
-		handleError(response, fmt.Errorf("%w %w", servererror.ErrNotValidMetricName, err), logger)
-		return
-	}
+	// Получаем контекст запроса для передачи в сервисный слой
+	ctx := c.Request.Context()
+
 	switch metricType {
 	case dto.Gauge:
-		gaugeDto, err := createGaugeDto(request, metricName)
-
+		gaugeDto, err := createGaugeDto(c, metricName)
 		if err != nil {
-			handleError(response, err, logger)
+			handleError(c, err, logger)
 			return
 		}
-		metricService.ProcessGauge(request.Context(), gaugeDto)
+		metricService.ProcessGauge(ctx, gaugeDto)
 
 	case dto.Counter:
-		counterDto, err := createCounterDto(request, metricName)
+		counterDto, err := createCounterDto(c, metricName)
 		if err != nil {
-			handleError(response, err, logger)
+			handleError(c, err, logger)
 			return
 		}
-		metricService.ProcessCounter(request.Context(), counterDto)
-
+		metricService.ProcessCounter(ctx, counterDto)
 	}
 
 	logger.Info("Метрика успешно обработана")
 
+	// Возвращаем успешный статус ответа text/plain
+	c.Status(http.StatusOK)
+}
+
+// HandleMetricGet хэндлер для обработки запроса на получение значения метрики
+func HandleMetricGet(c *gin.Context) {
+	repo := repository.MetricRepositoryImpl{}
+	metricService := service.NewMetricService(repo)
+
+	logger := utils.FromContext(c)
+
+	logger.Info("Поступил запрос на обработку метрики...")
+
+	// Парсим тип метрики
+	metricType, err := parseMetricType(c)
+	if err != nil {
+		handleError(c, err, logger)
+		return
+	}
+
+	// Парсим имя метрики
+	metricName, err := parseMetricName(c)
+	if err != nil {
+		handleError(c, fmt.Errorf("%w %w", servererror.ErrNotValidMetricName, err), logger)
+		return
+	}
+
+	// Получаем контекст запроса для передачи в сервисный слой
+	ctx := c.Request.Context()
+
+	var result string
+	switch metricType {
+	case dto.Gauge:
+		value, err := metricService.GetGaugeValue(ctx, metricName)
+		result = strconv.FormatFloat(value, 'g', -1, 64)
+		if err != nil {
+			handleError(c, err, logger)
+			return
+		}
+
+	case dto.Counter:
+		value, err := metricService.GetCounterValue(ctx, metricName)
+		result = strconv.FormatInt(value, 10)
+
+		if err != nil {
+			handleError(c, err, logger)
+			return
+		}
+	}
+
+	logger.Info("Метрика успешно получена")
+	c.String(http.StatusOK, result)
+
+	c.Status(http.StatusOK)
+}
+
+// HandleMetricGetAll хэндлер для обработки запроса на получение всех метрик
+func HandleMetricGetAll(c *gin.Context) {
+
+	repo := repository.MetricRepositoryImpl{}
+	metricService := service.NewMetricService(repo)
+
+	logger := utils.FromContext(c)
+
+	logger.Info("Поступил запрос на получение всех метрик...")
+	counters, gauges := metricService.GetAll(c)
+
+	html := createHtml(counters, gauges)
+
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+	logger.Info("Данные по метрикам успешно отправлены...")
+
+}
+
+func createHtml(counters []dto.CounterMetricDto, gauges []dto.GaugeMetricDto) string {
+	html := `<!DOCTYPE html>
+<html>
+<head>
+    <title>Все метрики</title>
+</head>
+<body>
+    <table>
+        <tr>
+            <th>Name</th>
+            <th>Value</th>
+        </tr>`
+
+	// Добавляем Counter-метрики в таблицу
+	for _, c := range counters {
+		html += fmt.Sprintf("<tr><td>%s</td><td>%d</td></tr>", c.Name, c.Value)
+	}
+	// Добавляем Gauge-метрики в таблицу
+	for _, g := range gauges {
+		// Преобразуем float64 в строку без лишних нулей на конце (-1)
+		valStr := strconv.FormatFloat(g.Value, 'f', -1, 64)
+		html += fmt.Sprintf("<tr><td>%s</td><td>%s</td></tr>", g.Name, valStr)
+	}
+	html += `    </table>
+</body>
+</html>`
+	return html
 }
 
 // parseMetricType Функция конвертации: строка -> MetricType. Возвращает тип и ошибку, если строка неизвестна
-func parseMetricType(request *http.Request) (dto.MetricType, error) {
-	metricType := request.PathValue(MetricTypePathKey)
+func parseMetricType(c *gin.Context) (dto.MetricType, error) {
+	metricType := c.Param(MetricTypePathKey)
 	switch metricType {
 	case "gauge":
 		return dto.Gauge, nil
@@ -84,8 +183,8 @@ func parseMetricType(request *http.Request) (dto.MetricType, error) {
 }
 
 // createCounterDto создаем CounterMetricDto
-func createCounterDto(request *http.Request, metricName string) (dto.CounterMetricDto, error) {
-	metricValueStr := request.PathValue(MetricValuePathKey)
+func createCounterDto(c *gin.Context, metricName string) (dto.CounterMetricDto, error) {
+	metricValueStr := c.Param(MetricValuePathKey)
 	metricValue, err := strconv.ParseInt(metricValueStr, 10, 64)
 	if err != nil {
 		return dto.CounterMetricDto{}, fmt.Errorf("%w %w", servererror.ErrNotValidMetricValue, err)
@@ -93,12 +192,12 @@ func createCounterDto(request *http.Request, metricName string) (dto.CounterMetr
 	return dto.CounterMetricDto{
 		Name:  metricName,
 		Value: metricValue,
-	}, err
+	}, nil
 }
 
-// createCounterDto создаем GaugeMetricDto
-func createGaugeDto(request *http.Request, metricName string) (dto.GaugeMetricDto, error) {
-	metricValueStr := request.PathValue(MetricValuePathKey)
+// createGaugeDto создаем GaugeMetricDto
+func createGaugeDto(c *gin.Context, metricName string) (dto.GaugeMetricDto, error) {
+	metricValueStr := c.Param(MetricValuePathKey)
 	metricValue, err := strconv.ParseFloat(metricValueStr, 64)
 	if err != nil {
 		return dto.GaugeMetricDto{}, fmt.Errorf("%w %w", servererror.ErrNotValidMetricValue, err)
@@ -106,39 +205,44 @@ func createGaugeDto(request *http.Request, metricName string) (dto.GaugeMetricDt
 	return dto.GaugeMetricDto{
 		Name:  metricName,
 		Value: metricValue,
-	}, err
+	}, nil
 }
 
 // parseMetricName парсим имя метрики
-func parseMetricName(request *http.Request) (string, error) {
-	metricName := request.PathValue(MetricNamePathKey)
+func parseMetricName(c *gin.Context) (string, error) {
+	metricName := c.Param(MetricNamePathKey)
 	if metricName == "" {
 		return "", servererror.ErrNotValidMetricName
 	}
 	return metricName, nil
 }
 
-// handleError маппинг кастомной ошибки в ожидаемые ответ
-func handleError(response http.ResponseWriter, err error, logger *slog.Logger) {
+// handleError маппинг кастомной ошибки в ожидаемый ответ
+func handleError(c *gin.Context, err error, logger *slog.Logger) {
 	if err != nil {
-
 		logger.Error(err.Error())
+
 		if errors.Is(err, servererror.ErrNotValidMetricName) {
-			http.Error(response, err.Error(), http.StatusNotFound)
+			c.String(http.StatusNotFound, err.Error())
+			return
+		}
+
+		if errors.Is(err, servererror.ErrMetricNotFound) {
+			c.String(http.StatusNotFound, err.Error())
 			return
 		}
 
 		if errors.Is(err, servererror.ErrNotAllowedMetricType) {
-			http.Error(response, err.Error(), http.StatusBadRequest)
+			c.String(http.StatusBadRequest, err.Error())
 			return
 		}
 
 		if errors.Is(err, servererror.ErrNotValidMetricValue) {
-			http.Error(response, err.Error(), http.StatusBadRequest)
+			c.String(http.StatusBadRequest, err.Error())
 			return
 		}
 
-		http.Error(response, "", http.StatusInternalServerError)
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 }

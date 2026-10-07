@@ -41,6 +41,6 @@ func send(baseURL string, metricType string, metricName string, metricValue stri
 		slog.Error("Произошла ошибка при чтении ответа, но работа продолжается..")
 	}
 
-	slog.Error("Отправлено..")
+	slog.Info("Отправлено..")
 	return nil
 }
