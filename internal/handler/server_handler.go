@@ -133,14 +133,14 @@ func HandleMetricGetAll(c *gin.Context) {
 	logger.Info("Поступил запрос на получение всех метрик...")
 	counters, gauges := metricService.GetAll(c)
 
-	html := createHtml(counters, gauges)
+	html := createHTML(counters, gauges)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 	logger.Info("Данные по метрикам успешно отправлены...")
 
 }
 
-func createHtml(counters []dto.CounterMetricDto, gauges []dto.GaugeMetricDto) string {
+func createHTML(counters []dto.CounterMetricDto, gauges []dto.GaugeMetricDto) string {
 	html := `<!DOCTYPE html>
 <html>
 <head>
