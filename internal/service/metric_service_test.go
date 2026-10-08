@@ -4,7 +4,10 @@ import (
 	"context"
 	"testing"
 
-	dto "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto/server"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/agent"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -49,17 +52,18 @@ func (m *MockMetricRepository) GetAll(ctx context.Context) (map[string]float64, 
 	return gauges, counters
 }
 
-func TestMetricServiceProcessGauge(t *testing.T) {
+func TestMetricServiceUpdateMetric(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		inputDto dto.GaugeMetricDto
+		inputDto dto.MetricDto
 	}{
 		{
 			name: "Успешная обработка Gauge Alloc",
-			inputDto: dto.GaugeMetricDto{
-				Name:  "Alloc",
-				Value: 12345.67,
+			inputDto: dto.MetricDto{
+				MetricName: "Alloc",
+				Gauge:      12345.67,
+				MetricType: constants.GaugeMetricType,
 			},
 		},
 	}
@@ -70,35 +74,58 @@ func TestMetricServiceProcessGauge(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := new(MockMetricRepository)
 			s := NewMetricService(mockRepo)
-			mockRepo.On("UpdateGauge", ctx, tt.inputDto.Name, tt.inputDto.Value).Return().Once()
-			s.ProcessGauge(ctx, tt.inputDto)
+			mockRepo.On("UpdateGauge", ctx, tt.inputDto.MetricName, tt.inputDto.Gauge).Return().Once()
+			s.UpdateMetric(ctx, &tt.inputDto)
 			mockRepo.AssertExpectations(t)
 		})
 	}
 }
 
-func TestMetricServiceProcessCounter(t *testing.T) {
-	ctx := context.Background()
+func TestMetricServiceGet(t *testing.T) {
 
 	tests := []struct {
-		name     string
-		inputDto dto.CounterMetricDto
+		name            string
+		metricName      string
+		metricType      string
+		expectedCounter int64
+		expectedGauge   float64
 	}{
 		{
-			name: "Успешная обработка Counter PollCount",
-			inputDto: dto.CounterMetricDto{
-				Name:  "PollCount",
-				Value: 5,
-			},
+			name:            "Успешная обработка Gauge Alloc",
+			metricName:      agent.Alloc,
+			metricType:      constants.GaugeMetricType,
+			expectedCounter: 0,
+			expectedGauge:   12345.67,
+		},
+		{
+			name:            "Успешная обработка Gauge Alloc",
+			metricName:      agent.RandomValue,
+			metricType:      constants.CounterMetricType,
+			expectedCounter: 100,
+			expectedGauge:   0,
 		},
 	}
 
 	for _, tt := range tests {
+		ctx := context.Background()
+
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := new(MockMetricRepository)
 			s := NewMetricService(mockRepo)
-			mockRepo.On("UpdateCounter", ctx, tt.inputDto.Name, tt.inputDto.Value).Return().Once()
-			s.ProcessCounter(ctx, tt.inputDto)
+			if tt.metricType == constants.GaugeMetricType {
+				mockRepo.On("GetGauge", ctx, tt.metricName).Return(tt.expectedGauge, nil)
+			} else {
+				mockRepo.On("GetCounter", ctx, tt.metricName).Return(tt.expectedCounter, nil)
+			}
+			metric, err := s.GetMetric(ctx, tt.metricType, tt.metricName)
+			if err != nil {
+				return
+			}
+
+			assert.Equal(t, tt.metricType, metric.MetricType)
+			assert.Equal(t, tt.expectedGauge, metric.Gauge)
+			assert.Equal(t, tt.expectedCounter, metric.Counter)
+			assert.Equal(t, tt.metricName, metric.MetricName)
 			mockRepo.AssertExpectations(t)
 		})
 	}

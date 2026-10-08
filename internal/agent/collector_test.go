@@ -1,10 +1,15 @@
 package agent
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
+)
 
 func TestUpdate(t *testing.T) {
 	type args struct {
-		currentValues *CurrentMetricValues
+		currentValues *dto.MetricCollection
 	}
 	tests := []struct {
 		name string
@@ -13,10 +18,7 @@ func TestUpdate(t *testing.T) {
 		{
 			name: "TestUpdateOK",
 			args: args{
-				currentValues: &CurrentMetricValues{
-					CounterMetrics: make(map[string]int64),
-					GaugeMetrics:   make(map[string]float64),
-				},
+				currentValues: &dto.MetricCollection{Metrics: make(map[string]dto.MetricDto)},
 			},
 		},
 	}
@@ -27,38 +29,40 @@ func TestUpdate(t *testing.T) {
 			// Вызываем тестируемую функцию вперые
 			Update(currentValues)
 
-			metricsToTest := []string{
-				Alloc,
-				BuckHashSys,
-				Frees,
-				GCCPUFraction,
-				GCSys,
-				HeapAlloc,
-				HeapIdle,
-				HeapInuse,
-				HeapObjects,
-				HeapReleased,
-				HeapSys,
-				LastGC,
-				Lookups,
-				MCacheInuse,
-				MCacheSys,
-				MSpanInuse,
-				MSpanSys,
-				Mallocs,
-				NextGC,
-				NumForcedGC,
-				NumGC,
-				OtherSys,
-				PauseTotalNs,
-				StackInuse,
-				StackSys,
-				Sys,
-				TotalAlloc,
+			metricsToTest := map[string]string{
+				Alloc:         constants.GaugeMetricType,
+				BuckHashSys:   constants.GaugeMetricType,
+				Frees:         constants.GaugeMetricType,
+				GCCPUFraction: constants.GaugeMetricType,
+				GCSys:         constants.GaugeMetricType,
+				HeapAlloc:     constants.GaugeMetricType,
+				HeapIdle:      constants.GaugeMetricType,
+				HeapInuse:     constants.GaugeMetricType,
+				HeapObjects:   constants.GaugeMetricType,
+				HeapReleased:  constants.GaugeMetricType,
+				HeapSys:       constants.GaugeMetricType,
+				LastGC:        constants.GaugeMetricType,
+				Lookups:       constants.GaugeMetricType,
+				MCacheInuse:   constants.GaugeMetricType,
+				MCacheSys:     constants.GaugeMetricType,
+				MSpanInuse:    constants.GaugeMetricType,
+				MSpanSys:      constants.GaugeMetricType,
+				Mallocs:       constants.GaugeMetricType,
+				NextGC:        constants.GaugeMetricType,
+				NumForcedGC:   constants.GaugeMetricType,
+				NumGC:         constants.GaugeMetricType,
+				OtherSys:      constants.GaugeMetricType,
+				PauseTotalNs:  constants.GaugeMetricType,
+				StackInuse:    constants.GaugeMetricType,
+				StackSys:      constants.GaugeMetricType,
+				Sys:           constants.GaugeMetricType,
+				TotalAlloc:    constants.GaugeMetricType,
+				RandomValue:   constants.CounterMetricType,
+				PollCount:     constants.CounterMetricType,
 			}
 
-			for _, metricName := range metricsToTest {
-				val, ok := currentValues.GaugeMetrics[metricName]
+			for metricName, metricType := range metricsToTest {
+				val, ok := currentValues.Metrics[metricName]
 				if !ok {
 					t.Errorf("Метрика %s не была собрана (отсутствует в мапе GaugeMetrics)", metricName)
 					continue
@@ -72,18 +76,26 @@ func TestUpdate(t *testing.T) {
 					metricName == HeapReleased ||
 					metricName == LastGC ||
 					metricName == GCCPUFraction ||
-					metricName == NumGC
+					metricName == NumGC ||
+					metricName == RandomValue
+				if metricType == constants.GaugeMetricType {
+					if !canBeZero && val.Gauge <= 0 {
+						t.Errorf("Метрика %s должна быть больше 0, но получили %f", metricName, val.Gauge)
+					}
+				}
 
-				if !canBeZero && val <= 0 {
-					t.Errorf("Метрика %s должна быть больше 0, но получили %f", metricName, val)
+				if metricType == constants.CounterMetricType {
+					if !canBeZero && val.Counter <= 0 {
+						t.Errorf("Метрика %s должна быть больше 0, но получили %d", metricName, val.Counter)
+					}
 				}
 			}
 
-			// 3. Вызываем Update второй раз, чтобы проверить логику инкремента
+			// Вызываем Update второй раз, чтобы проверить логику инкремента
 			Update(currentValues)
 
-			if currentValues.CounterMetrics[PollCount] != 2 {
-				t.Errorf("После второго Update ожидался PollCount = 2, получили %d", currentValues.CounterMetrics[PollCount])
+			if currentValues.Metrics[PollCount].Counter != 2 {
+				t.Errorf("После второго Update ожидался PollCount = 2, получили %d", currentValues.Metrics[PollCount].Counter)
 			}
 		})
 	}

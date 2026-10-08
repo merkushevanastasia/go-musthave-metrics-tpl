@@ -60,7 +60,7 @@ func TestHandleMetricUpdate(t *testing.T) {
 			want: ExpectedData{
 				Code:        404,
 				ContentType: "text/plain; charset=utf-8",
-				Response:    "в запросе отсутствует имя метрики в запросе отсутствует имя метрики",
+				Response:    "в запросе отсутствует имя метрики",
 			},
 		},
 	}

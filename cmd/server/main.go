@@ -1,17 +1,15 @@
 package main
 
 import (
-	"fmt"
+	"flag"
 	"log/slog"
 
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/handler"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
-
-var serverPort = 8080
-var level = "debug"
 
 func main() {
 	slog.Info("Запуск сервера для сбора рантайм-метрик...")
@@ -28,7 +26,6 @@ func LoggingMiddleware() gin.HandlerFunc {
 			"path", ctx.Request.URL.Path,
 		)
 		ctx.Set(utils.LoggerKey, logger)
-
 		ctx.Next()
 
 		logger.Debug("Обработка метода завершена. Отдаем ответ")
@@ -36,29 +33,27 @@ func LoggingMiddleware() gin.HandlerFunc {
 }
 
 func run() {
+	conf := server.Config{Level: "debug"}
 
-	utils.InitBaseLogger(utils.LoggerConfig{Level: level})
+	// получаем необходимые настройки из аргументов командной строки
+	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
+	flag.Parse()
+
+	// настраиваем дефолтный логгер
+	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.Level})
 	gin.SetMode(gin.ReleaseMode)
 
-	slog.Info("Инициализация http-server-а...")
-	pathUpdate := fmt.Sprintf("/update/:%s/:%s/:%s",
-		handler.MetricTypePathKey,
-		handler.MetricNamePathKey,
-		handler.MetricValuePathKey,
-	)
-	pathGet := fmt.Sprintf("/value/:%s/:%s",
-		handler.MetricTypePathKey,
-		handler.MetricNamePathKey,
-	)
+	slog.Info("Инициализация http-server-а")
+	// инициализируем http-server
 	router := gin.New()
-	router.POST(pathUpdate, handler.HandleMetricUpdate)
-	router.GET(pathGet, handler.HandleMetricGet)
-	router.GET("/", handler.HandleMetricGetAll)
+	router.LoadHTMLGlob("templates/*")
+	handler.SetUpRoutes(router)
 	// Оборачиваем ВЕСЬ роутер в middleware для логирования каждого запроса и простановки MDC
 	router.Use(LoggingMiddleware())
-	slog.Info("Инициализация http-server-а выполнена успешно. Запуск...")
+
 	// Запуск сервера на порту
-	err := router.Run(fmt.Sprintf(":%d", serverPort))
+	slog.Info("Инициализация http-server-а выполнена успешно")
+	err := router.Run(conf.ServerURL)
 	if err != nil {
 		slog.Error("Ошибка во время запуска http-сервера на порту ", slog.Any("err", err.Error()))
 	}
