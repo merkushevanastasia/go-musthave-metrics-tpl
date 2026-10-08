@@ -42,11 +42,11 @@ func run() {
 	// настраиваем дефолтный логгер
 	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.Level})
 	gin.SetMode(gin.ReleaseMode)
+	gin.Recovery()
 
 	slog.Info("Инициализация http-server-а")
 	// инициализируем http-server
 	router := gin.New()
-	router.LoadHTMLGlob("templates/*")
 	router.Use(LoggingMiddleware())
 	handler.SetUpRoutes(router)
 

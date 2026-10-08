@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
@@ -103,10 +104,22 @@ func HandleMetricGetAll(c *gin.Context) {
 		handleError(c, err)
 		return
 	}
-	c.HTML(http.StatusOK, "metrics.html", gin.H{
-		"Metrics": metrics,
-	})
 
+	// 2. Формируем HTML в виде обычной строки
+	var html strings.Builder
+	html.WriteString("<html><head><title>Metrics</title></head><body><h1>Current Metrics</h1><ul>")
+
+	// Замените на ваш цикл по вашим метрикам
+	for _, m := range metrics {
+		if m.MetricType == constants.GaugeMetricType {
+			html.WriteString(fmt.Sprintf("<li>%s: %v</li>", m.MetricName, m.Gauge))
+		} else if m.MetricType == constants.CounterMetricType {
+			html.WriteString(fmt.Sprintf("<li>%s: %v</li>", m.MetricName, m.Counter))
+		}
+	}
+
+	html.WriteString("</ul></body></html>")
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html.String()))
 	log.Info("Данные по метрикам успешно отправлены...")
 
 }
