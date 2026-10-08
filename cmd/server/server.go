@@ -37,7 +37,7 @@ func LoggingMiddleware() gin.HandlerFunc {
 func run() {
 
 	s := flag.String("a", "localhost:8080", "server url")
-	slog.Info("АДРЕС В ТАКОМ ФОРМАТЕ!!!!!!!! ")
+	slog.Info("АДРЕС В ТАКОМ ФОРМАТЕ!!!!!!!! ", slog.Any("server url", *s))
 	cleaned := strings.TrimPrefix(*s, "http://")
 	conf := server.Config{Level: "debug", ServerURL: cleaned}
 	flag.Parse()
