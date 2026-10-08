@@ -47,9 +47,8 @@ func run() {
 	// инициализируем http-server
 	router := gin.New()
 	router.LoadHTMLGlob("templates/*")
-	handler.SetUpRoutes(router)
-	// Оборачиваем ВЕСЬ роутер в middleware для логирования каждого запроса и простановки MDC
 	router.Use(LoggingMiddleware())
+	handler.SetUpRoutes(router)
 
 	// Запуск сервера на порту
 	slog.Info("Инициализация http-server-а выполнена успешно")

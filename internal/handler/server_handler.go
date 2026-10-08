@@ -58,7 +58,7 @@ func HandleMetricUpdate(c *gin.Context) {
 func HandleMetricGet(c *gin.Context) {
 
 	log := utils.FromContext(c)
-	log.Info("Поступил запрос на обработку метрики...")
+	log.Info("Поступил запрос на получение метрики...")
 
 	// Парсим тип метрики
 	metricType, err := parseMetricType(c)
