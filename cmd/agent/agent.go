@@ -20,11 +20,13 @@ func main() {
 
 	//получаем настройки, переданные в аргументах запуска
 	conf := config.Config{LogLevel: "debug"}
-	flag.StringVar(&conf.ServerURL, "a", "http://localhost:8080", "server url")
+	serverURL := flag.String("a", "localhost:8080", "server url")
 	flag.IntVar(&conf.ReportInterval, "r", 10, "report interval")
 	flag.IntVar(&conf.PollInterval, "p", 2, "report interval")
-
+	flag.Parse()
 	//Создаем базовый клиент для запросов на сервер Метрик
+
+	conf.ServerURL = *serverURL
 	agent.InitClient(conf)
 
 	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.LogLevel})
