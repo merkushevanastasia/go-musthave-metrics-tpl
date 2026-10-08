@@ -175,7 +175,7 @@ func handleError(c *gin.Context, err error) {
 		}
 
 		if errors.Is(err, servererror.ErrMetricNotFound) {
-			c.String(http.StatusNotFound, err.Error())
+			c.Status(http.StatusNotFound)
 			return
 		}
 
