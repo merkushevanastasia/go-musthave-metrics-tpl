@@ -37,10 +37,11 @@ func LoggingMiddleware() gin.HandlerFunc {
 func run() {
 
 	s := flag.String("a", "localhost:8080", "server url")
-	slog.Info("АДРЕС В ТАКОМ ФОРМАТЕ!!!!!!!! ", slog.Any("server url", *s))
+
+	flag.Parse()
 	cleaned := strings.TrimPrefix(*s, "http://")
 	conf := server.Config{Level: "debug", ServerURL: cleaned}
-	flag.Parse()
+	slog.Info("АДРЕС В ТАКОМ ФОРМАТЕ!!!!!!!! ", slog.Any("server url", *s))
 
 	// настраиваем дефолтный логгер
 	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.Level})
