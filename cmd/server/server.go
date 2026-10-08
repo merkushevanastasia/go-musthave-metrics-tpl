@@ -23,6 +23,7 @@ func LoggingMiddleware() gin.HandlerFunc {
 		reqID := uuid.New()
 		var logger = slog.Default().With("requestId", reqID)
 		logger.Debug("Входящий HTTP запрос",
+			"host", ctx.Request.Host,
 			"method", ctx.Request.Method,
 			"path", ctx.Request.URL.Path,
 		)
@@ -36,6 +37,7 @@ func LoggingMiddleware() gin.HandlerFunc {
 func run() {
 
 	s := flag.String("a", "localhost:8080", "server url")
+	slog.Info("АДРЕС В ТАКОМ ФОРМАТЕ!!!!!!!! ")
 	cleaned := strings.TrimPrefix(*s, "http://")
 	conf := server.Config{Level: "debug", ServerURL: cleaned}
 	flag.Parse()
