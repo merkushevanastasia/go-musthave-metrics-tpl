@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log/slog"
+	"strings"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/handler"
@@ -33,10 +34,10 @@ func LoggingMiddleware() gin.HandlerFunc {
 }
 
 func run() {
-	conf := server.Config{Level: "debug"}
 
-	// получаем необходимые настройки из аргументов командной строки
-	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
+	s := flag.String("a", "localhost:8080", "server url")
+	cleaned := strings.TrimPrefix(*s, "http://")
+	conf := server.Config{Level: "debug", ServerURL: cleaned}
 	flag.Parse()
 
 	// настраиваем дефолтный логгер

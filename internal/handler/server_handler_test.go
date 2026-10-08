@@ -68,14 +68,10 @@ func TestHandleMetricUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {})
 		{
-			// 1. Создаем роутер Gin и регистрируем хэндлер с параметрами пути
 			router := gin.New()
 
-			// Настройте параметры пути точно так, как они объявлены в вашем main.go
-			// Например: /update/:metricType/:metricName/:metricValue
 			router.POST("/update/:metric_type/:metric_name/:metric_value", HandleMetricUpdate)
 
-			// 2. Создаем запрос и рекордер
 			request := httptest.NewRequest(tt.input.Method, tt.input.URL, nil)
 
 			w := httptest.NewRecorder()

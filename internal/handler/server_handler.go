@@ -109,7 +109,6 @@ func HandleMetricGetAll(c *gin.Context) {
 	var html strings.Builder
 	html.WriteString("<html><head><title>Metrics</title></head><body><h1>Current Metrics</h1><ul>")
 
-	// Замените на ваш цикл по вашим метрикам
 	for _, m := range metrics {
 		if m.MetricType == constants.GaugeMetricType {
 			html.WriteString(fmt.Sprintf("<li>%s: %v</li>", m.MetricName, m.Gauge))
