@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"log/slog"
-	"strings"
+	"os"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/handler"
@@ -37,10 +37,14 @@ func LoggingMiddleware() gin.HandlerFunc {
 func run() {
 
 	s := flag.String("a", "localhost:8080", "server url")
-
 	flag.Parse()
-	cleaned := strings.TrimPrefix(*s, "http://")
-	conf := server.Config{Level: "debug", ServerURL: cleaned}
+
+	// 2. Проверяем переменную окружения ADDRESS. Если она есть — перезаписываем значение флага
+	serverAddr := *s
+	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
+		serverAddr = envAddr
+	}
+	conf := server.Config{Level: "debug", ServerURL: serverAddr}
 	slog.Info("АДРЕС В ТАКОМ ФОРМАТЕ!!!!!!!! ", slog.Any("server url", *s))
 
 	// настраиваем дефолтный логгер
