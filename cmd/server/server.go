@@ -41,7 +41,7 @@ func run() {
 	flag.Parse()
 	// Сейчас это перестраховка, чтобы gin принял, если на вход принесут с http://
 	cleaned := strings.TrimPrefix(*s, "http://")
-	conf := server.Config{Level: "debug", ServerURL: cleaned}
+	conf := server.Config{Level: "error", ServerURL: cleaned}
 	slog.Info("АДРЕС В ТАКОМ ФОРМАТЕ!!!!!!!! ", slog.Any("server url", *s))
 
 	// настраиваем дефолтный логгер
