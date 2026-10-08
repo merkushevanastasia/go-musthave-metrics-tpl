@@ -56,5 +56,5 @@ func send(metricType string, metricName string, metricValue string) error {
 }
 
 func InitClient(config config.Config) {
-	metricServerClient = resty.New().SetBaseURL("http://" + config.ServerURL)
+	metricServerClient = resty.New().SetBaseURL(config.ServerURL)
 }
