@@ -23,7 +23,7 @@ func HandleMetricUpdate(response http.ResponseWriter, request *http.Request) {
 	logger := utils.FromContext(request.Context())
 	logger.Info("Поступил запрос на обработку метрики...")
 
-	// Разрешен только Post-запрос
+	// Разрешен только Post--запрос
 	if request.Method != http.MethodPost {
 		handleError(response, servererror.ErrNotAllowedMethod, logger)
 		return
