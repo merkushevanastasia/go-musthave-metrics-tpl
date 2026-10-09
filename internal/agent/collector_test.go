@@ -30,54 +30,54 @@ func TestUpdate(t *testing.T) {
 			Update(currentValues)
 
 			metricsToTest := map[string]string{
-				Alloc:         constants.GaugeMetricType,
-				BuckHashSys:   constants.GaugeMetricType,
-				Frees:         constants.GaugeMetricType,
-				GCCPUFraction: constants.GaugeMetricType,
-				GCSys:         constants.GaugeMetricType,
-				HeapAlloc:     constants.GaugeMetricType,
-				HeapIdle:      constants.GaugeMetricType,
-				HeapInuse:     constants.GaugeMetricType,
-				HeapObjects:   constants.GaugeMetricType,
-				HeapReleased:  constants.GaugeMetricType,
-				HeapSys:       constants.GaugeMetricType,
-				LastGC:        constants.GaugeMetricType,
-				Lookups:       constants.GaugeMetricType,
-				MCacheInuse:   constants.GaugeMetricType,
-				MCacheSys:     constants.GaugeMetricType,
-				MSpanInuse:    constants.GaugeMetricType,
-				MSpanSys:      constants.GaugeMetricType,
-				Mallocs:       constants.GaugeMetricType,
-				NextGC:        constants.GaugeMetricType,
-				NumForcedGC:   constants.GaugeMetricType,
-				NumGC:         constants.GaugeMetricType,
-				OtherSys:      constants.GaugeMetricType,
-				PauseTotalNs:  constants.GaugeMetricType,
-				StackInuse:    constants.GaugeMetricType,
-				StackSys:      constants.GaugeMetricType,
-				Sys:           constants.GaugeMetricType,
-				TotalAlloc:    constants.GaugeMetricType,
-				RandomValue:   constants.CounterMetricType,
-				PollCount:     constants.CounterMetricType,
+				constants.Alloc:         constants.GaugeMetricType,
+				constants.BuckHashSys:   constants.GaugeMetricType,
+				constants.Frees:         constants.GaugeMetricType,
+				constants.GCCPUFraction: constants.GaugeMetricType,
+				constants.GCSys:         constants.GaugeMetricType,
+				constants.HeapAlloc:     constants.GaugeMetricType,
+				constants.HeapIdle:      constants.GaugeMetricType,
+				constants.HeapInuse:     constants.GaugeMetricType,
+				constants.HeapObjects:   constants.GaugeMetricType,
+				constants.HeapReleased:  constants.GaugeMetricType,
+				constants.HeapSys:       constants.GaugeMetricType,
+				constants.LastGC:        constants.GaugeMetricType,
+				constants.Lookups:       constants.GaugeMetricType,
+				constants.MCacheInuse:   constants.GaugeMetricType,
+				constants.MCacheSys:     constants.GaugeMetricType,
+				constants.MSpanInuse:    constants.GaugeMetricType,
+				constants.MSpanSys:      constants.GaugeMetricType,
+				constants.Mallocs:       constants.GaugeMetricType,
+				constants.NextGC:        constants.GaugeMetricType,
+				constants.NumForcedGC:   constants.GaugeMetricType,
+				constants.NumGC:         constants.GaugeMetricType,
+				constants.OtherSys:      constants.GaugeMetricType,
+				constants.PauseTotalNs:  constants.GaugeMetricType,
+				constants.StackInuse:    constants.GaugeMetricType,
+				constants.StackSys:      constants.GaugeMetricType,
+				constants.Sys:           constants.GaugeMetricType,
+				constants.TotalAlloc:    constants.GaugeMetricType,
+				constants.RandomValue:   constants.CounterMetricType,
+				constants.PollCount:     constants.CounterMetricType,
 			}
 
 			for metricName, metricType := range metricsToTest {
-				val, ok := currentValues.Metrics[metricName]
-				if !ok {
-					t.Errorf("Метрика %s не была собрана (отсутствует в мапе GaugeMetrics)", metricName)
+				val, isPresent := currentValues.Metrics[metricName]
+				if !isPresent {
+					t.Errorf("Метрика %s не была собрана (отсутствует в Metrics)", metricName)
 					continue
 				}
 
 				// Некоторые метрики рантайма гарантированно равны 0 на старте программы (так как сборщик мусора еще не успел поработать), делаем для них исключение
 				// (это я узнала у ИИ, но спорить не стала)
-				canBeZero := metricName == NumForcedGC ||
-					metricName == PauseTotalNs ||
-					metricName == Lookups ||
-					metricName == HeapReleased ||
-					metricName == LastGC ||
-					metricName == GCCPUFraction ||
-					metricName == NumGC ||
-					metricName == RandomValue
+				canBeZero := metricName == constants.NumForcedGC ||
+					metricName == constants.PauseTotalNs ||
+					metricName == constants.Lookups ||
+					metricName == constants.HeapReleased ||
+					metricName == constants.LastGC ||
+					metricName == constants.GCCPUFraction ||
+					metricName == constants.NumGC ||
+					metricName == constants.RandomValue
 				if metricType == constants.GaugeMetricType {
 					if !canBeZero && val.Gauge <= 0 {
 						t.Errorf("Метрика %s должна быть больше 0, но получили %f", metricName, val.Gauge)
@@ -91,11 +91,14 @@ func TestUpdate(t *testing.T) {
 				}
 			}
 
+			if currentValues.Metrics[constants.PollCount].Counter != 1 {
+				t.Errorf("После первого Update ожидался PollCount = 1, получили %d", currentValues.Metrics[constants.PollCount].Counter)
+			}
 			// Вызываем Update второй раз, чтобы проверить логику инкремента
 			Update(currentValues)
 
-			if currentValues.Metrics[PollCount].Counter != 2 {
-				t.Errorf("После второго Update ожидался PollCount = 2, получили %d", currentValues.Metrics[PollCount].Counter)
+			if currentValues.Metrics[constants.PollCount].Counter != 2 {
+				t.Errorf("После второго Update ожидался PollCount = 2, получили %d", currentValues.Metrics[constants.PollCount].Counter)
 			}
 		})
 	}

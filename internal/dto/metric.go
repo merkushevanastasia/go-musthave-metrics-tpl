@@ -27,7 +27,6 @@ func (mc *MetricCollection) AddCounter(metricName string, value int64) {
 	metricValue.Counter += value
 	metricValue.MetricType = constants.CounterMetricType
 	mc.Metrics[metricName] = metricValue
-
 }
 
 func (mc *MetricCollection) AddGauge(metricName string, value float64) {

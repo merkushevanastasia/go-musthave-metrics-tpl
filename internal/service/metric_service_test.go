@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/agent"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
 	"github.com/stretchr/testify/assert"
@@ -92,14 +91,14 @@ func TestMetricServiceGet(t *testing.T) {
 	}{
 		{
 			name:            "Успешная обработка Gauge Alloc",
-			metricName:      agent.Alloc,
+			metricName:      constants.Alloc,
 			metricType:      constants.GaugeMetricType,
 			expectedCounter: 0,
 			expectedGauge:   12345.67,
 		},
 		{
 			name:            "Успешная обработка Gauge Alloc",
-			metricName:      agent.RandomValue,
+			metricName:      constants.RandomValue,
 			metricType:      constants.CounterMetricType,
 			expectedCounter: 100,
 			expectedGauge:   0,

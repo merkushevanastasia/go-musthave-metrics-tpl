@@ -35,11 +35,8 @@ func SetUpRoutes(router *gin.Engine) {
 // HandleMetricUpdate хэндлер для обработки запроса на обновление значения метрики
 func HandleMetricUpdate(c *gin.Context) {
 
-	// Получаем логгер из контекста Gin (ключ приведен к string, так как Gin использует строки в качестве ключей)
 	log := utils.FromContext(c)
 	log.Info("Поступил запрос на обработку метрики...")
-
-	// Парсим тип метрики
 
 	gaugeDto, err := createGaugeDto(c)
 	if err != nil {
@@ -51,7 +48,6 @@ func HandleMetricUpdate(c *gin.Context) {
 
 	log.Info("Метрика успешно обработана")
 
-	// Возвращаем успешный статус ответа text/plain
 	c.Status(http.StatusOK)
 }
 
@@ -61,14 +57,12 @@ func HandleMetricGet(c *gin.Context) {
 	log := utils.FromContext(c)
 	log.Info("Поступил запрос на получение метрики...")
 
-	// Парсим тип метрики
 	metricType, err := parseMetricType(c)
 	if err != nil {
 		handleError(c, err)
 		return
 	}
 
-	// Парсим имя метрики
 	metricName, err := parseMetricName(c)
 	if err != nil {
 		handleError(c, err)
@@ -76,6 +70,7 @@ func HandleMetricGet(c *gin.Context) {
 	}
 
 	metric, err := metricService.GetMetric(c, metricType, metricName)
+
 	if err != nil {
 		handleError(c, err)
 		return
@@ -105,7 +100,7 @@ func HandleMetricGetAll(c *gin.Context) {
 		return
 	}
 
-	// 2. Формируем HTML в виде обычной строки
+	// Был вариант лучше через templates, но в тестах проьоема из-за путей, пришлось прямо руками здесь формировать
 	var html strings.Builder
 	html.WriteString("<html><head><title>Metrics</title></head><body><h1>Current Metrics</h1><ul>")
 

@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"log/slog"
-	"strings"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/handler"
@@ -36,15 +35,12 @@ func LoggingMiddleware() gin.HandlerFunc {
 
 func run() {
 
-	s := flag.String("a", "localhost:8080", "server url")
+	conf := server.Config{Level: "error"}
 
+	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
 	flag.Parse()
-	// Сейчас это перестраховка, чтобы gin принял, если на вход принесут с http://
-	cleaned := strings.TrimPrefix(*s, "http://")
-	conf := server.Config{Level: "error", ServerURL: cleaned}
-	slog.Info("АДРЕС В ТАКОМ ФОРМАТЕ!!!!!!!! ", slog.Any("server url", *s))
 
-	// настраиваем дефолтный логгер
+	// Настраиваем дефолтный логгер
 	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.Level})
 	gin.SetMode(gin.ReleaseMode)
 	gin.Recovery()

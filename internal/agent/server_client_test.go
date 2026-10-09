@@ -15,11 +15,11 @@ func TestSendAllSuccess(t *testing.T) {
 
 	actualUrls := make([]string, 0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		actualUrls = append(actualUrls, r.URL.Path)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
+
 	InitClient(config.Config{ServerURL: ts.URL})
 
 	type args struct {
@@ -36,15 +36,15 @@ func TestSendAllSuccess(t *testing.T) {
 			args: args{
 				values: &dto.MetricCollection{
 					Metrics: map[string]dto.MetricDto{
-						Alloc: {
+						constants.Alloc: {
 							MetricType: constants.GaugeMetricType,
 							Gauge:      12345.67,
 						},
-						HeapAlloc: {
+						constants.HeapAlloc: {
 							MetricType: constants.GaugeMetricType,
 							Gauge:      500000,
 						},
-						PollCount: {
+						constants.PollCount: {
 							MetricType: constants.CounterMetricType,
 							Counter:    5,
 						},

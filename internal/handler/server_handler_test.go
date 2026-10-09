@@ -88,8 +88,6 @@ func TestHandleMetricUpdate(t *testing.T) {
 			resBody, err := io.ReadAll(response.Body)
 			assert.Equal(t, tt.want.Response, string(resBody))
 			assert.NoError(t, err)
-
 		}
-
 	}
 }

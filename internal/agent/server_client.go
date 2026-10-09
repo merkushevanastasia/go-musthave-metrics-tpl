@@ -24,10 +24,10 @@ func SendAll(values *dto.MetricCollection) {
 		err := send(metricValue.MetricType, metricName, valueStr)
 		if err != nil {
 			slog.Error("Произошла ошибка", slog.Any("err", err))
+			return
 		}
+		slog.Info("Метрики успешно отправлены на сервер...")
 	}
-	slog.Info("Метрики успешно отправлены на сервер...")
-
 }
 
 func send(metricType string, metricName string, metricValue string) error {
@@ -46,7 +46,6 @@ func send(metricType string, metricName string, metricValue string) error {
 		return err
 	}
 
-	// Проверяем статус ответа (опционально, но рекомендуется)
 	if resp.IsError() {
 		slog.Error("Сервер вернул ошибку", "status", resp.Status())
 	}
