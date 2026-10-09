@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -26,6 +27,7 @@ func main() {
 	flag.IntVar(&conf.ReportInterval, "r", 10, "report interval")
 	flag.IntVar(&conf.PollInterval, "p", 2, "report interval")
 	flag.Parse()
+	checkServerURL(&conf)
 
 	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.LogLevel})
 
@@ -59,4 +61,10 @@ func main() {
 	<-sigChan
 
 	slog.Info("Завершение работы мониторинга...")
+}
+
+func checkServerURL(conf *config.Config) {
+	if !strings.HasPrefix(conf.ServerURL, "http://") {
+		conf.ServerURL = "http://" + conf.ServerURL
+	}
 }
