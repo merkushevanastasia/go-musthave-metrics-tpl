@@ -1,6 +1,7 @@
 module github.com/Yandex-Practicum/go-musthave-metrics-tpl
 
-go 1.26.4
+// todo повысить после того как починят
+go 1.25.0
 
 require (
 	github.com/bytedance/gopkg v0.1.3
