@@ -57,7 +57,7 @@ func TestUpdate(t *testing.T) {
 				constants.StackSys:      constants.GaugeMetricType,
 				constants.Sys:           constants.GaugeMetricType,
 				constants.TotalAlloc:    constants.GaugeMetricType,
-				constants.RandomValue:   constants.CounterMetricType,
+				constants.RandomValue:   constants.GaugeMetricType,
 				constants.PollCount:     constants.CounterMetricType,
 			}
 
