@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Все метрики</title>
+</head>
+<body>
+<table>
+    <thead>
+    <tr>
+        <th>Name</th>
+        <th>Value</th>
+    </tr>
+    </thead>
+    <tbody>
+    {{range .Metrics}}
+    <tr>
+        <td>{{.MetricName}}</td>
+        <td>
+            {{if eq .MetricType "gauge"}}
+            {{.Gauge}}
+            {{else if eq .MetricType "counter"}}
+            {{.Counter}}
+            {{else}}
+            Неизвестный тип
+            {{end}}
+        </td>
+    </tr>
+    {{end}}
+    </tbody>
+</table>
+</body>
+</html>

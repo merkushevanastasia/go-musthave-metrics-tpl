@@ -1,0 +1,68 @@
+package main
+
+import (
+	"flag"
+	"log/slog"
+
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/handler"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/static"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
+
+func main() {
+	slog.Info("Запуск сервера для сбора рантайм-метрик...")
+	run()
+}
+
+// LoggingMiddleware Здесь мы логируем начало и конец обработки любого запроса, а так же проставляем requestId в логгер
+func LoggingMiddleware() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		reqID := uuid.New()
+		var logger = slog.Default().With("requestId", reqID)
+		logger.Debug("Входящий HTTP запрос",
+			"host", ctx.Request.Host,
+			"method", ctx.Request.Method,
+			"path", ctx.Request.URL.Path,
+		)
+		ctx.Set(utils.LoggerKey, logger)
+		ctx.Next()
+		logger.Debug("Обработка метода завершена. Отдаем ответ")
+	}
+}
+
+func run() {
+
+	conf := server.Config{LogLevel: "debug"}
+
+	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
+	flag.Parse()
+
+	// Настраиваем дефолтный логгер
+	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.LogLevel})
+	gin.SetMode(gin.ReleaseMode)
+
+	slog.Info("Инициализация http-server-а")
+	// инициализируем http-server
+	router := gin.New()
+	router.Use(LoggingMiddleware())
+	router.Use(gin.Recovery())
+	fs := static.SetUpFs()
+	router.SetHTMLTemplate(fs)
+
+	repoImpl := repository.NewMetricRepositoryImpl()
+	serviceImpl := service.NewMetricServiceImpl(repoImpl)
+
+	handler.SetUpRoutes(router, serviceImpl)
+
+	// Запуск сервера на порту
+	slog.Info("Инициализация http-server-а выполнена успешно")
+	err := router.Run(conf.ServerURL)
+	if err != nil {
+		slog.Error("Ошибка во время запуска http-сервера на порту ", slog.Any("err", err.Error()))
+	}
+}
