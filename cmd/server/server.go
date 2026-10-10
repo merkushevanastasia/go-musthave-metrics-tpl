@@ -6,6 +6,8 @@ import (
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/handler"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/static"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
 	"github.com/gin-gonic/gin"
@@ -35,13 +37,13 @@ func LoggingMiddleware() gin.HandlerFunc {
 
 func run() {
 
-	conf := server.Config{Level: "debug"}
+	conf := server.Config{LogLevel: "debug"}
 
 	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
 	flag.Parse()
 
 	// Настраиваем дефолтный логгер
-	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.Level})
+	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.LogLevel})
 	gin.SetMode(gin.ReleaseMode)
 
 	slog.Info("Инициализация http-server-а")
@@ -52,7 +54,10 @@ func run() {
 	fs := static.SetUpFs()
 	router.SetHTMLTemplate(fs)
 
-	handler.SetUpRoutes(router)
+	repoImpl := repository.NewMetricRepositoryImpl()
+	serviceImpl := service.NewMetricServiceImpl(repoImpl)
+
+	handler.SetUpRoutes(router, serviceImpl)
 
 	// Запуск сервера на порту
 	slog.Info("Инициализация http-server-а выполнена успешно")

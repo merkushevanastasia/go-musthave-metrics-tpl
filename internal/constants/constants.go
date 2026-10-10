@@ -1,7 +1,7 @@
 package constants
 
-var GaugeMetricType = "gauge"
-var CounterMetricType = "counter"
+const GaugeMetricType = "gauge"
+const CounterMetricType = "counter"
 
 const Alloc = "Alloc"
 const BuckHashSys = "BuckHashSys"

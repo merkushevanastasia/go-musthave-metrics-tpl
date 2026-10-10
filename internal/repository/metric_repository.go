@@ -23,39 +23,45 @@ type MetricRepository interface {
 	GetAll(ctx context.Context) (map[string]float64, map[string]int64)
 }
 
-type MetricRepositoryImpl struct{}
-
-var memStorage = MemStorage{
-	Gauge:   make(map[string]float64),
-	Counter: make(map[string]int64),
+type MetricRepositoryImpl struct {
+	Storage MemStorage
 }
 
-func (MetricRepositoryImpl) UpdateGauge(ctx context.Context, metricName string, value float64) {
+func NewMetricRepositoryImpl() *MetricRepositoryImpl {
+	return &MetricRepositoryImpl{
+		Storage: MemStorage{
+			Gauge:   make(map[string]float64),
+			Counter: make(map[string]int64),
+		},
+	}
+}
+
+func (repository MetricRepositoryImpl) UpdateGauge(ctx context.Context, metricName string, value float64) {
 
 	log := utils.FromContext(ctx)
-	log.Debug("Хранилище метрик перед обновлением.", slog.Any("memStorage", memStorage))
-	memStorage.Gauge[metricName] = value
-	log.Debug("Хранилище метрик послк обновления.", slog.Any("memStorage", memStorage))
+	log.Debug("Хранилище метрик перед обновлением.", slog.Any("memStorage", repository.Storage))
+	repository.Storage.Gauge[metricName] = value
+	log.Debug("Хранилище метрик послк обновления.", slog.Any("memStorage", repository.Storage))
 
 }
-func (MetricRepositoryImpl) UpdateCounter(ctx context.Context, metricName string, value int64) {
+func (repository MetricRepositoryImpl) UpdateCounter(ctx context.Context, metricName string, value int64) {
 	log := utils.FromContext(ctx)
-	log.Debug("Хранилище метрик перед обновлением.", slog.Any("memStorage", memStorage))
-	_, isPresent := memStorage.Counter[metricName]
+	log.Debug("Хранилище метрик перед обновлением.", slog.Any("memStorage", repository.Storage))
+	_, isPresent := repository.Storage.Counter[metricName]
 
 	if isPresent {
-		memStorage.Counter[metricName] += value
+		repository.Storage.Counter[metricName] += value
 	} else {
-		memStorage.Counter[metricName] = value
+		repository.Storage.Counter[metricName] = value
 	}
-	log.Debug("Хранилище метрик послк обновления.", slog.Any("memStorage", memStorage))
+	log.Debug("Хранилище метрик послк обновления.", slog.Any("memStorage", repository.Storage))
 
 }
 
-func (MetricRepositoryImpl) GetGauge(ctx context.Context, metricName string) (float64, error) {
+func (repository MetricRepositoryImpl) GetGauge(ctx context.Context, metricName string) (float64, error) {
 	log := utils.FromContext(ctx)
 	log.Debug("Запрос значения метрики из хранилища", slog.Any("имя метрики", metricName))
-	currentValue, isPresent := memStorage.Gauge[metricName]
+	currentValue, isPresent := repository.Storage.Gauge[metricName]
 	if isPresent {
 		return currentValue, nil
 	}
@@ -64,10 +70,10 @@ func (MetricRepositoryImpl) GetGauge(ctx context.Context, metricName string) (fl
 	return currentValue, customerrors.ErrMetricNotFound
 }
 
-func (MetricRepositoryImpl) GetCounter(ctx context.Context, metricName string) (int64, error) {
+func (repository MetricRepositoryImpl) GetCounter(ctx context.Context, metricName string) (int64, error) {
 	log := utils.FromContext(ctx)
 	log.Debug("Запрос значения метрики из хранилища", slog.Any("имя метрики", metricName))
-	currentValue, isPresent := memStorage.Counter[metricName]
+	currentValue, isPresent := repository.Storage.Counter[metricName]
 
 	if isPresent {
 		return currentValue, nil
@@ -77,8 +83,8 @@ func (MetricRepositoryImpl) GetCounter(ctx context.Context, metricName string) (
 	return currentValue, customerrors.ErrMetricNotFound
 }
 
-func (MetricRepositoryImpl) GetAll(ctx context.Context) (map[string]float64, map[string]int64) {
+func (repository MetricRepositoryImpl) GetAll(ctx context.Context) (map[string]float64, map[string]int64) {
 	log := utils.FromContext(ctx)
 	log.Debug("Получение всех метрик из хранилища")
-	return memStorage.Gauge, memStorage.Counter
+	return repository.Storage.Gauge, repository.Storage.Counter
 }

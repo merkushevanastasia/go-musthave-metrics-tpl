@@ -1,4 +1,4 @@
-package server
+package agent
 
 type Config struct {
 	PollInterval   int

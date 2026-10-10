@@ -8,17 +8,23 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 )
 
-type MetricService struct {
+type MetricService interface {
+	UpdateMetric(ctx context.Context, dto *dto.MetricDto)
+	GetMetric(ctx context.Context, metricType string, metricName string) (dto.MetricDto, error)
+	GetAll(ctx context.Context) ([]dto.MetricDto, error)
+}
+
+type MetricServiceImpl struct {
 	repo repository.MetricRepository
 }
 
-func NewMetricService(repo repository.MetricRepository) *MetricService {
-	return &MetricService{
+func NewMetricServiceImpl(repo repository.MetricRepository) *MetricServiceImpl {
+	return &MetricServiceImpl{
 		repo: repo,
 	}
 }
 
-func (s *MetricService) UpdateMetric(ctx context.Context, dto *dto.MetricDto) {
+func (s *MetricServiceImpl) UpdateMetric(ctx context.Context, dto *dto.MetricDto) {
 	if dto.MetricType == constants.GaugeMetricType {
 		s.repo.UpdateGauge(ctx, dto.MetricName, dto.Gauge)
 	} else if dto.MetricType == constants.CounterMetricType {
@@ -26,7 +32,7 @@ func (s *MetricService) UpdateMetric(ctx context.Context, dto *dto.MetricDto) {
 	}
 }
 
-func (s *MetricService) GetMetric(ctx context.Context, metricType string, metricName string) (dto.MetricDto, error) {
+func (s *MetricServiceImpl) GetMetric(ctx context.Context, metricType string, metricName string) (dto.MetricDto, error) {
 
 	result := dto.MetricDto{
 		MetricName: metricName,
@@ -50,7 +56,7 @@ func (s *MetricService) GetMetric(ctx context.Context, metricType string, metric
 	return result, nil
 }
 
-func (s *MetricService) GetAll(ctx context.Context) ([]dto.MetricDto, error) {
+func (s *MetricServiceImpl) GetAll(ctx context.Context) ([]dto.MetricDto, error) {
 	gaugeMetricEntities, counterMetricEntities := s.repo.GetAll(ctx)
 
 	result := make([]dto.MetricDto, 0)

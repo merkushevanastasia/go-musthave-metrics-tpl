@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
@@ -40,7 +41,8 @@ func TestHandleMetricUpdate(t *testing.T) {
 				ContentType: "text/plain; charset=utf-8",
 				Response:    "",
 			},
-		}, {
+		},
+		{
 			name: "TestHandleMetricUpdateCounterOk",
 			input: InputData{
 				URL:    "/update/counter/NameMetric/10",
@@ -51,7 +53,8 @@ func TestHandleMetricUpdate(t *testing.T) {
 				ContentType: "text/plain; charset=utf-8",
 				Response:    "",
 			},
-		}, {
+		},
+		{
 			name: "TestHandleMetricUpdateMetricNameError",
 			input: InputData{
 				URL:    "/update/counter//10",
@@ -65,12 +68,12 @@ func TestHandleMetricUpdate(t *testing.T) {
 		},
 	}
 
+	mockServiceImpl := &service.MockMetricService{}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {})
-		{
+		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
 
-			router.POST("/update/:metric_type/:metric_name/:metric_value", HandleMetricUpdate)
+			router.POST("/update/:metric_type/:metric_name/:metric_value", HandleMetricUpdate(mockServiceImpl))
 
 			request := httptest.NewRequest(tt.input.Method, tt.input.URL, nil)
 
@@ -78,16 +81,19 @@ func TestHandleMetricUpdate(t *testing.T) {
 			router.ServeHTTP(w, request)
 
 			response := w.Result()
-			assert.Equal(t, tt.want.Code, response.StatusCode)
+
 			defer func(Body io.ReadCloser) {
 				err := Body.Close()
 				if err != nil {
-					slog.Error("Body close: %v", slog.Any("err", err))
+					slog.Error("Body close error", slog.Any("err", err))
 				}
 			}(response.Body)
+
+			assert.Equal(t, tt.want.Code, response.StatusCode)
+
 			resBody, err := io.ReadAll(response.Body)
-			assert.Equal(t, tt.want.Response, string(resBody))
 			assert.NoError(t, err)
-		}
+			assert.Equal(t, tt.want.Response, string(resBody))
+		})
 	}
 }
