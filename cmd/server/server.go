@@ -6,6 +6,7 @@ import (
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/handler"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/static"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -28,14 +29,13 @@ func LoggingMiddleware() gin.HandlerFunc {
 		)
 		ctx.Set(utils.LoggerKey, logger)
 		ctx.Next()
-
 		logger.Debug("Обработка метода завершена. Отдаем ответ")
 	}
 }
 
 func run() {
 
-	conf := server.Config{Level: "error"}
+	conf := server.Config{Level: "debug"}
 
 	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
 	flag.Parse()
@@ -43,12 +43,15 @@ func run() {
 	// Настраиваем дефолтный логгер
 	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.Level})
 	gin.SetMode(gin.ReleaseMode)
-	gin.Recovery()
 
 	slog.Info("Инициализация http-server-а")
 	// инициализируем http-server
 	router := gin.New()
 	router.Use(LoggingMiddleware())
+	router.Use(gin.Recovery())
+	fs := static.SetUpFs()
+	router.SetHTMLTemplate(fs)
+
 	handler.SetUpRoutes(router)
 
 	// Запуск сервера на порту

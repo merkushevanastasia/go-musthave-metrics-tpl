@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
@@ -35,7 +34,7 @@ func SetUpRoutes(router *gin.Engine) {
 // HandleMetricUpdate хэндлер для обработки запроса на обновление значения метрики
 func HandleMetricUpdate(c *gin.Context) {
 
-	log := utils.FromContext(c)
+	log := utils.GetLogger(c)
 	log.Info("Поступил запрос на обработку метрики...")
 
 	gaugeDto, err := createGaugeDto(c)
@@ -54,7 +53,7 @@ func HandleMetricUpdate(c *gin.Context) {
 // HandleMetricGet хэндлер для обработки запроса на получение значения метрики
 func HandleMetricGet(c *gin.Context) {
 
-	log := utils.FromContext(c)
+	log := utils.GetLogger(c)
 	log.Info("Поступил запрос на получение метрики...")
 
 	metricType, err := parseMetricType(c)
@@ -91,7 +90,7 @@ func HandleMetricGet(c *gin.Context) {
 // HandleMetricGetAll хэндлер для обработки запроса на получение всех метрик
 func HandleMetricGetAll(c *gin.Context) {
 
-	log := utils.FromContext(c)
+	log := utils.GetLogger(c)
 
 	log.Info("Поступил запрос на получение всех метрик...")
 	metrics, err := metricService.GetAll(c)
@@ -100,20 +99,9 @@ func HandleMetricGetAll(c *gin.Context) {
 		return
 	}
 
-	// Был вариант лучше через templates, но в тестах проьоема из-за путей, пришлось прямо руками здесь формировать
-	var html strings.Builder
-	html.WriteString("<html><head><title>Metrics</title></head><body><h1>Current Metrics</h1><ul>")
-
-	for _, m := range metrics {
-		if m.MetricType == constants.GaugeMetricType {
-			html.WriteString(fmt.Sprintf("<li>%s: %v</li>", m.MetricName, m.Gauge))
-		} else if m.MetricType == constants.CounterMetricType {
-			html.WriteString(fmt.Sprintf("<li>%s: %v</li>", m.MetricName, m.Counter))
-		}
-	}
-
-	html.WriteString("</ul></body></html>")
-	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html.String()))
+	c.HTML(http.StatusOK, "metrics.html", gin.H{
+		"Metrics": metrics,
+	})
 	log.Info("Данные по метрикам успешно отправлены...")
 
 }

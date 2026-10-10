@@ -47,9 +47,9 @@ func Update(metricCollection *dto.MetricCollection) {
 	metricCollection.AddGauge(constants.StackSys, float64(m.StackSys))
 	metricCollection.AddGauge(constants.Sys, float64(m.Sys))
 	metricCollection.AddGauge(constants.TotalAlloc, float64(m.TotalAlloc))
+	metricCollection.AddGauge(constants.RandomValue, rand.Float64())
 
 	metricCollection.AddCounter(constants.PollCount, 1)
-	metricCollection.AddCounter(constants.RandomValue, rand.Int64N(10000))
 
 	slog.Debug("Собрали и обновили метрики.", slog.Any("До обновления ", metricCollection.Metrics))
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"os"
+
+	"github.com/gin-gonic/gin"
 )
 
 type ctxKey struct{}
@@ -18,7 +20,6 @@ type LoggerConfig struct {
 func InitBaseLogger(config LoggerConfig) {
 	slog.Info("Инициализация настроек базового логера...")
 	logLevel := parseLogLevel(config.Level)
-	slog.Info("Базовый логгер успешно проинициализировн")
 	opts := &slog.HandlerOptions{
 		Level: logLevel,
 	}
@@ -26,6 +27,8 @@ func InitBaseLogger(config LoggerConfig) {
 	handler := slog.NewJSONHandler(os.Stdout, opts)
 	baseLogger := slog.New(handler)
 	slog.SetDefault(baseLogger)
+	slog.Info("Базовый логгер успешно проинициализировн")
+
 }
 
 // parseLogLevel парсим из строки уровень логирования
@@ -47,5 +50,15 @@ func FromContext(ctx context.Context) *slog.Logger {
 	if logger, ok := ctx.Value(LoggerKey).(*slog.Logger); ok {
 		return logger
 	}
+	return slog.Default()
+}
+
+func GetLogger(ctx *gin.Context) *slog.Logger {
+	if val, exists := ctx.Get(LoggerKey); exists {
+		if logger, ok := val.(*slog.Logger); ok {
+			return logger
+		}
+	}
+	// Если логгера нет в контексте, возвращаем дефолтный, чтобы избежать паники
 	return slog.Default()
 }
