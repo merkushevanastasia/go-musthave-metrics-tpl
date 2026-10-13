@@ -2,13 +2,13 @@ package handler
 
 import (
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -85,7 +85,7 @@ func TestHandleMetricUpdate(t *testing.T) {
 			defer func(Body io.ReadCloser) {
 				err := Body.Close()
 				if err != nil {
-					slog.Error("Body close error", slog.Any("err", err))
+					log.Logger.Error().Any("err", err).Msg("Body close error")
 				}
 			}(response.Body)
 

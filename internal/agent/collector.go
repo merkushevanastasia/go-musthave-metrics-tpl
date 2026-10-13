@@ -1,12 +1,12 @@
 package agent
 
 import (
-	"log/slog"
 	"math/rand/v2"
 	"runtime"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
+	"github.com/rs/zerolog/log"
 )
 
 func Update(metricCollection *dto.MetricCollection) {
@@ -14,8 +14,8 @@ func Update(metricCollection *dto.MetricCollection) {
 	metricCollection.Mu.Lock()
 	defer metricCollection.Mu.Unlock()
 
-	slog.Debug("Запускаем процесс сбора метрик.", slog.Any("До обновления ", metricCollection.Metrics))
-	slog.Info("Собираем метрики...")
+	log.Debug().Any("До обновления ", metricCollection.Metrics).Msg("Запускаем процесс сбора метрик.")
+	log.Info().Msg("Собираем метрики...")
 
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
@@ -51,5 +51,6 @@ func Update(metricCollection *dto.MetricCollection) {
 
 	metricCollection.AddCounter(constants.PollCount, 1)
 
-	slog.Debug("Собрали и обновили метрики.", slog.Any("До обновления ", metricCollection.Metrics))
+	log.Debug().Any("После обновления ", metricCollection.Metrics).Msg("Собрали и обновили метрики.")
+	log.Info().Msg("Собрали и обновили метрики.")
 }

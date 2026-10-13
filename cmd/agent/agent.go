@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
-	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -15,13 +13,14 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
 	"github.com/caarlos0/env/v11"
+	"github.com/rs/zerolog/log"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/agent"
 )
 
 func main() {
 
-	slog.Info("Запуск агента по сбору метрик ...")
+	log.Info().Msg("Запуск агента по сбору метрик ...")
 
 	// Получаем настройки, переданные в аргументах запуска
 	conf := config.Config{LogLevel: "debug"}
@@ -31,12 +30,12 @@ func main() {
 	flag.IntVar(&conf.PollInterval, "p", 2, "report interval")
 	flag.Parse()
 	if err := env.Parse(&conf); err != nil {
-		log.Printf("failed to parse env variables: %v", err)
+		log.Error().Any("err", err).Msg("Ошибка во время парсинга конфигурации")
 	}
 	checkServerURL(&conf)
 
 	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.LogLevel})
-	slog.Debug("Конфиг", slog.Any("config", conf))
+	log.Debug().Any("Конфиг", conf).Msg("Содержимое конфига")
 
 	// Инициаоизируем базовый клиент для запросов на сервер Метрик
 	agent.InitClient(conf)
@@ -67,11 +66,12 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
-	slog.Info("Завершение работы мониторинга...")
+	log.Info().Msg("Завершение работы мониторинга...")
 }
 
 func checkServerURL(conf *config.Config) {
 	if !strings.HasPrefix(conf.ServerURL, "http://") {
+		log.Info().Any("Переданный адрес", conf.ServerURL).Msg("Добавляем http:// для resty")
 		conf.ServerURL = "http://" + conf.ServerURL
 	}
 }
