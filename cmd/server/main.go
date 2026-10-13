@@ -49,6 +49,6 @@ func run() {
 	slog.Info("Инициализация http-server-а выполнена успешно. Запуск...")
 	err := http.ListenAndServe(fmt.Sprintf(":%d", serverPort), wrappedMux)
 	if err != nil {
-		slog.Error("Ошибка во время запуска http-сервера на порту ", err.Error())
+		slog.Error("Ошибка во время запуска http-сервера на порту ", slog.Any("err", err.Error()))
 	}
 }

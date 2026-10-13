@@ -9,6 +9,7 @@ import (
 
 	dto "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto/server"
 	servererror "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
 )
@@ -19,6 +20,10 @@ var MetricTypePathKey = "metric_type"
 
 // HandleMetricUpdate хэндлер для обработки запроса на обновление значения метрики
 func HandleMetricUpdate(response http.ResponseWriter, request *http.Request) {
+
+	repo := repository.MetricRepositoryImpl{}
+	metricService := service.NewMetricService(repo)
+
 	//Получаем логер с MDC
 	logger := utils.FromContext(request.Context())
 	logger.Info("Поступил запрос на обработку метрики...")
@@ -41,7 +46,6 @@ func HandleMetricUpdate(response http.ResponseWriter, request *http.Request) {
 		handleError(response, fmt.Errorf("%w %w", servererror.ErrNotValidMetricName, err), logger)
 		return
 	}
-
 	switch metricType {
 	case dto.Gauge:
 		gaugeDto, err := createGaugeDto(request, metricName)
@@ -50,7 +54,7 @@ func HandleMetricUpdate(response http.ResponseWriter, request *http.Request) {
 			handleError(response, err, logger)
 			return
 		}
-		service.ProcessGauge(request.Context(), gaugeDto)
+		metricService.ProcessGauge(request.Context(), gaugeDto)
 
 	case dto.Counter:
 		counterDto, err := createCounterDto(request, metricName)
@@ -58,7 +62,7 @@ func HandleMetricUpdate(response http.ResponseWriter, request *http.Request) {
 			handleError(response, err, logger)
 			return
 		}
-		service.ProcessCounter(request.Context(), counterDto)
+		metricService.ProcessCounter(request.Context(), counterDto)
 
 	}
 
