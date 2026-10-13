@@ -5,6 +5,7 @@ go 1.25.0
 
 require (
 	github.com/bytedance/gopkg v0.1.3
+	github.com/caarlos0/env/v11 v11.4.1
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/google/uuid v1.6.0

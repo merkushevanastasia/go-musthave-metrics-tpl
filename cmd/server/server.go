@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"log"
 	"log/slog"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
@@ -10,6 +11,7 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/static"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
+	"github.com/caarlos0/env/v11"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -41,9 +43,14 @@ func run() {
 
 	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
 	flag.Parse()
+	if err := env.Parse(&conf); err != nil {
+		log.Printf("failed to parse env variables: %v", err)
+	}
 
 	// Настраиваем дефолтный логгер
 	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.LogLevel})
+	slog.Debug("Конфиг", slog.Any("config", conf))
+
 	gin.SetMode(gin.ReleaseMode)
 
 	slog.Info("Инициализация http-server-а")
