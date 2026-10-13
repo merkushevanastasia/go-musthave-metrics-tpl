@@ -1,13 +1,12 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/handler"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -20,34 +19,46 @@ func main() {
 }
 
 // LoggingMiddleware Здесь мы логируем начало и конец обработки любого запроса, а так же проставляем requestId в логгер
-func LoggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+func LoggingMiddleware() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
 		reqID := uuid.New()
 		var logger = slog.Default().With("requestId", reqID)
 		logger.Debug("Входящий HTTP запрос",
-			"method", r.Method,
-			"path", r.URL.Path,
+			"method", ctx.Request.Method,
+			"path", ctx.Request.URL.Path,
 		)
-		ctx = context.WithValue(ctx, utils.LoggerKey, logger)
+		ctx.Set(utils.LoggerKey, logger)
 
-		next.ServeHTTP(w, r.WithContext(ctx))
+		ctx.Next()
 
 		logger.Debug("Обработка метода завершена. Отдаем ответ")
-	})
+	}
 }
 
 func run() {
 
 	utils.InitBaseLogger(utils.LoggerConfig{Level: level})
+	gin.SetMode(gin.ReleaseMode)
 
 	slog.Info("Инициализация http-server-а...")
-	mux := http.NewServeMux()
-	mux.HandleFunc(fmt.Sprintf("/update/{%s}/{%s}/{%s}", handler.MetricTypePathKey, handler.MetricNamePathKey, handler.MetricValuePathKey), handler.HandleMetricUpdate)
+	pathUpdate := fmt.Sprintf("/update/:%s/:%s/:%s",
+		handler.MetricTypePathKey,
+		handler.MetricNamePathKey,
+		handler.MetricValuePathKey,
+	)
+	pathGet := fmt.Sprintf("/value/:%s/:%s",
+		handler.MetricTypePathKey,
+		handler.MetricNamePathKey,
+	)
+	router := gin.New()
+	router.POST(pathUpdate, handler.HandleMetricUpdate)
+	router.GET(pathGet, handler.HandleMetricGet)
+	router.GET("/", handler.HandleMetricGetAll)
 	// Оборачиваем ВЕСЬ роутер в middleware для логирования каждого запроса и простановки MDC
-	wrappedMux := LoggingMiddleware(mux)
+	router.Use(LoggingMiddleware())
 	slog.Info("Инициализация http-server-а выполнена успешно. Запуск...")
-	err := http.ListenAndServe(fmt.Sprintf(":%d", serverPort), wrappedMux)
+	// Запуск сервера на порту
+	err := router.Run(fmt.Sprintf(":%d", serverPort))
 	if err != nil {
 		slog.Error("Ошибка во время запуска http-сервера на порту ", slog.Any("err", err.Error()))
 	}
