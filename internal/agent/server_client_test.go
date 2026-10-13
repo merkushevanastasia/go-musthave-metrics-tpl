@@ -5,6 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,8 +20,10 @@ func TestSendAllSuccess(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	InitClient(config.Config{ServerURL: ts.URL})
+
 	type args struct {
-		values        *CurrentMetricValues
+		values        *dto.MetricCollection
 		baseURL       string
 		expectedPaths []string
 	}
@@ -29,13 +34,20 @@ func TestSendAllSuccess(t *testing.T) {
 		{
 			name: "Успешно отправлены все метрики",
 			args: args{
-				values: &CurrentMetricValues{
-					GaugeMetrics: map[string]float64{
-						"Alloc":     12345.67,
-						"HeapAlloc": 500000,
-					},
-					CounterMetrics: map[string]int64{
-						"PollCount": 5,
+				values: &dto.MetricCollection{
+					Metrics: map[string]dto.MetricDto{
+						constants.Alloc: {
+							MetricType: constants.GaugeMetricType,
+							Gauge:      12345.67,
+						},
+						constants.HeapAlloc: {
+							MetricType: constants.GaugeMetricType,
+							Gauge:      500000,
+						},
+						constants.PollCount: {
+							MetricType: constants.CounterMetricType,
+							Counter:    5,
+						},
 					},
 				},
 				expectedPaths: []string{
@@ -48,7 +60,7 @@ func TestSendAllSuccess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			SendAll(tt.args.values, ts.URL)
+			SendAll(tt.args.values)
 			assert.ElementsMatch(t, tt.args.expectedPaths, actualUrls)
 		})
 	}

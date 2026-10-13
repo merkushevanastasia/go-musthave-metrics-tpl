@@ -1,6 +1,7 @@
-package agent
+package constants
 
-import "sync"
+const GaugeMetricType = "gauge"
+const CounterMetricType = "counter"
 
 const Alloc = "Alloc"
 const BuckHashSys = "BuckHashSys"
@@ -32,16 +33,3 @@ const TotalAlloc = "TotalAlloc"
 
 const PollCount = "PollCount"
 const RandomValue = "RandomValue"
-
-type CurrentMetricValues struct {
-	mu             sync.Mutex
-	GaugeMetrics   map[string]float64
-	CounterMetrics map[string]int64
-}
-
-func NewCurrentValues() *CurrentMetricValues {
-	return &CurrentMetricValues{
-		GaugeMetrics:   make(map[string]float64),
-		CounterMetrics: make(map[string]int64),
-	}
-}

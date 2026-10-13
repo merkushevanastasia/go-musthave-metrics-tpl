@@ -3,50 +3,71 @@ package service
 import (
 	"context"
 
-	dto "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto/server"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 )
 
-type MetricService struct {
+type MetricService interface {
+	UpdateMetric(ctx context.Context, dto *dto.MetricDto)
+	GetMetric(ctx context.Context, metricType string, metricName string) (dto.MetricDto, error)
+	GetAll(ctx context.Context) ([]dto.MetricDto, error)
+}
+
+type MetricServiceImpl struct {
 	repo repository.MetricRepository
 }
 
-func NewMetricService(repo repository.MetricRepository) *MetricService {
-	return &MetricService{
+func NewMetricServiceImpl(repo repository.MetricRepository) *MetricServiceImpl {
+	return &MetricServiceImpl{
 		repo: repo,
 	}
 }
 
-func (s *MetricService) ProcessGauge(ctx context.Context, dto dto.GaugeMetricDto) {
-	s.repo.UpdateGauge(ctx, dto.Name, dto.Value)
+func (s *MetricServiceImpl) UpdateMetric(ctx context.Context, dto *dto.MetricDto) {
+	if dto.MetricType == constants.GaugeMetricType {
+		s.repo.UpdateGauge(ctx, dto.MetricName, dto.Gauge)
+	} else if dto.MetricType == constants.CounterMetricType {
+		s.repo.UpdateCounter(ctx, dto.MetricName, dto.Counter)
+	}
 }
 
-func (s *MetricService) ProcessCounter(ctx context.Context, dto dto.CounterMetricDto) {
-	s.repo.UpdateCounter(ctx, dto.Name, dto.Value)
+func (s *MetricServiceImpl) GetMetric(ctx context.Context, metricType string, metricName string) (dto.MetricDto, error) {
+
+	result := dto.MetricDto{
+		MetricName: metricName,
+		MetricType: metricType,
+	}
+
+	if metricType == constants.GaugeMetricType {
+		value, err := s.repo.GetGauge(ctx, metricName)
+		if err != nil {
+			return dto.MetricDto{}, err
+		}
+		result.Gauge = value
+	}
+	if metricType == constants.CounterMetricType {
+		value, err := s.repo.GetCounter(ctx, metricName)
+		if err != nil {
+			return dto.MetricDto{}, err
+		}
+		result.Counter = value
+	}
+	return result, nil
 }
 
-func (s *MetricService) GetGaugeValue(ctx context.Context, metricName string) (float64, error) {
-	value, err := s.repo.GetGauge(ctx, metricName)
-	return value, err
-}
-
-func (s *MetricService) GetCounterValue(ctx context.Context, metricName string) (int64, error) {
-	value, err := s.repo.GetCounter(ctx, metricName)
-	return value, err
-}
-
-func (s *MetricService) GetAll(ctx context.Context) ([]dto.CounterMetricDto, []dto.GaugeMetricDto) {
+func (s *MetricServiceImpl) GetAll(ctx context.Context) ([]dto.MetricDto, error) {
 	gaugeMetricEntities, counterMetricEntities := s.repo.GetAll(ctx)
 
-	resCounterList := make([]dto.CounterMetricDto, 0)
-	resGaugeList := make([]dto.GaugeMetricDto, 0)
+	result := make([]dto.MetricDto, 0)
 
-	for k, v := range counterMetricEntities {
-		resCounterList = append(resCounterList, dto.CounterMetricDto{Name: k, Value: v})
-	}
-	for k, v := range gaugeMetricEntities {
-		resGaugeList = append(resGaugeList, dto.GaugeMetricDto{Name: k, Value: v})
+	for name, value := range counterMetricEntities {
+		result = append(result, dto.MetricDto{MetricType: constants.CounterMetricType, MetricName: name, Counter: value})
 	}
 
-	return resCounterList, resGaugeList
+	for name, value := range gaugeMetricEntities {
+		result = append(result, dto.MetricDto{MetricType: constants.GaugeMetricType, MetricName: name, Gauge: value})
+	}
+
+	return result, nil
 }
