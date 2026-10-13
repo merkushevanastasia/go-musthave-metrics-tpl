@@ -2,19 +2,19 @@ package agent
 
 import (
 	"errors"
-	"log/slog"
 	"strconv"
 
 	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
 	"github.com/go-resty/resty/v2"
+	"github.com/rs/zerolog/log"
 )
 
 var metricServerClient *resty.Client
 
 func SendAll(values *dto.MetricCollection) {
-	slog.Info("Отправляем метрики на сервер...")
+	log.Info().Msg("Отправляем метрики на сервер...")
 	for metricName, metricValue := range values.Metrics {
 		var valueStr string
 		if metricValue.MetricType == constants.CounterMetricType {
@@ -24,16 +24,16 @@ func SendAll(values *dto.MetricCollection) {
 		}
 		err := send(metricValue.MetricType, metricName, valueStr)
 		if err != nil {
-			slog.Error("Произошла ошибка", slog.Any("err", err))
+			log.Error().Any("err", err).Msg("Произошла ошибка")
 		}
 	}
-	slog.Info("Отправка метрик на сервер завершена...")
+	log.Info().Msg("Отправка метрик на сервер завершена...")
 
 }
 
 func send(metricType string, metricName string, metricValue string) error {
 
-	slog.Debug("Отправляется ", slog.Any("Метрика", metricName))
+	log.Debug().Any("Метрика", metricName).Msg("Отправляется ")
 	resp, err := metricServerClient.R().
 		SetHeader("Content-Type", "text/plain").
 		SetPathParams(map[string]string{
@@ -48,11 +48,11 @@ func send(metricType string, metricName string, metricValue string) error {
 	}
 
 	if resp.IsError() {
-		slog.Error("Сервер вернул ошибку", "status", resp.Status())
+		log.Error().Any("status", resp.Status()).Msg("Сервер вернул ошибку")
 		return errors.New("Вернулсся ошибочный код" + resp.Status())
 	}
 
-	slog.Info("Отправлено..")
+	log.Info().Msg("Отправлено..")
 	return nil
 }
 

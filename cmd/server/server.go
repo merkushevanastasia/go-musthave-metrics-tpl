@@ -2,7 +2,8 @@ package main
 
 import (
 	"flag"
-	"log/slog"
+	"net/http"
+	"time"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/handler"
@@ -10,28 +11,56 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/static"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
+	"github.com/caarlos0/env/v11"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	log "github.com/rs/zerolog/log"
 )
 
 func main() {
-	slog.Info("Запуск сервера для сбора рантайм-метрик...")
+	log.Printf("Запуск сервера для сбора рантайм-метрик...")
 	run()
 }
 
 // LoggingMiddleware Здесь мы логируем начало и конец обработки любого запроса, а так же проставляем requestId в логгер
 func LoggingMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		reqID := uuid.New()
-		var logger = slog.Default().With("requestId", reqID)
-		logger.Debug("Входящий HTTP запрос",
-			"host", ctx.Request.Host,
-			"method", ctx.Request.Method,
-			"path", ctx.Request.URL.Path,
-		)
-		ctx.Set(utils.LoggerKey, logger)
+		start := time.Now()
+		reqID := uuid.New().String()
+		logger := log.With().Str("requestId", reqID).Logger()
+		reqCtx := logger.WithContext(ctx.Request.Context())
+		ctx.Request = ctx.Request.WithContext(reqCtx)
+
+		responseData := &utils.ResponseData{
+			Status: http.StatusOK, // По умолчанию 200, если хэндлер не вызовет WriteHeader явным образом
+			Size:   0,
+		}
+
+		lw := &utils.LoggingResponseWriter{
+			ResponseWriter: ctx.Writer,
+			ResponseData:   responseData,
+		}
+
+		ctx.Writer = lw
+
+		logger.Debug().
+			Str("host", ctx.Request.Host).
+			Str("method", ctx.Request.Method).
+			Str("path", ctx.Request.URL.Path).
+			Msg("Входящий HTTP запрос")
+
 		ctx.Next()
-		logger.Debug("Обработка метода завершена. Отдаем ответ")
+
+		duration := time.Since(start)
+		// todo перенесла duration в ответ, потому что это логичнее.
+		// По логам важно понять, когда запрос поступил, что происходило,
+		// и чем закончился. А если лог о поступлении запроса будет после его обработки, на мой взгляд странно
+		logger.Debug().
+			Dur("duration", duration).
+			Int("size", responseData.Size).
+			Int("status", responseData.Status).
+			Msg("Обработка метода завершена. Отдаем ответ")
+
 	}
 }
 
@@ -41,12 +70,17 @@ func run() {
 
 	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
 	flag.Parse()
+	if err := env.Parse(&conf); err != nil {
+		log.Printf("failed to parse env variables: %v", err)
+	}
 
 	// Настраиваем дефолтный логгер
 	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.LogLevel})
+	log.Debug().Any("Конфиг", conf).Msg("Содержимое конфига")
+
 	gin.SetMode(gin.ReleaseMode)
 
-	slog.Info("Инициализация http-server-а")
+	log.Info().Msg("Инициализация http-server-а")
 	// инициализируем http-server
 	router := gin.New()
 	router.Use(LoggingMiddleware())
@@ -60,9 +94,10 @@ func run() {
 	handler.SetUpRoutes(router, serviceImpl)
 
 	// Запуск сервера на порту
-	slog.Info("Инициализация http-server-а выполнена успешно")
+	log.Info().Msg("Инициализация http-server-а выполнена успешно")
+
 	err := router.Run(conf.ServerURL)
 	if err != nil {
-		slog.Error("Ошибка во время запуска http-сервера на порту ", slog.Any("err", err.Error()))
+		log.Info().Any("error", err.Error()).Msg("Ошибка во время запуска http-сервера на порту ")
 	}
 }
