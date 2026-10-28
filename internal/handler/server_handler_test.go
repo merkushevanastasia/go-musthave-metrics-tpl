@@ -72,11 +72,10 @@ func TestHandleMetricUpdate(t *testing.T) {
 	}
 
 	mockServiceImpl := &service.MockMetricService{}
+	router := gin.New()
+	router.POST("/update/:metric_type/:metric_name/:metric_value", HandleMetricUpdate(mockServiceImpl))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := gin.New()
-
-			router.POST("/update/:metric_type/:metric_name/:metric_value", HandleMetricUpdate(mockServiceImpl))
 
 			request := httptest.NewRequest(tt.input.Method, tt.input.URL, nil)
 
@@ -100,8 +99,9 @@ func TestHandleMetricUpdate(t *testing.T) {
 		})
 	}
 }
+
 func floatPtr(v float64) *float64 {
-	return &v
+	return new(v)
 }
 func TestHandleMetricUpdateV2(t *testing.T) {
 	gin.SetMode(gin.TestMode)
