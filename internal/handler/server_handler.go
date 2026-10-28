@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,9 +12,8 @@ import (
 	servererror "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
-	"github.com/rs/zerolog"
-
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 )
 
 var MetricNamePathKey = "metric_name"
@@ -22,10 +22,14 @@ var MetricTypePathKey = "metric_type"
 
 func SetUpRoutes(router *gin.Engine, metricService service.MetricService) {
 	pathUpdate := fmt.Sprintf("/update/:%s/:%s/:%s", MetricTypePathKey, MetricNamePathKey, MetricValuePathKey)
+	pathUpdateV2 := fmt.Sprintf("/update")
 	pathGet := fmt.Sprintf("/value/:%s/:%s", MetricTypePathKey, MetricNamePathKey)
+	pathGetV2 := fmt.Sprintf("/value")
 	router.POST(pathUpdate, HandleMetricUpdate(metricService))
 	router.GET(pathGet, HandleMetricGet(metricService))
+	router.POST(pathGetV2, HandleMetricGetV2(metricService))
 	router.GET("/", HandleMetricGetAll(metricService))
+	router.POST(pathUpdateV2, HandleMetricUpdateV2(metricService))
 }
 
 // HandleMetricUpdate хэндлер для обработки запроса на обновление значения метрики
@@ -36,6 +40,31 @@ func HandleMetricUpdate(metricService service.MetricService) gin.HandlerFunc {
 		log.Info().Msg("Поступил запрос на обработку метрики...")
 
 		gaugeDto, err := createGaugeDto(c)
+		if err != nil {
+			handleError(c, err, log)
+			return
+		}
+
+		metricService.UpdateMetric(c.Request.Context(), gaugeDto)
+
+		log.Info().Msg("Метрика успешно обработана")
+
+		c.Status(http.StatusOK)
+	}
+}
+
+func HandleMetricUpdateV2(metricService service.MetricService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := utils.FromContext(c.Request.Context())
+		var metricRequest dto.MetricsRequest
+		if err := json.NewDecoder(c.Request.Body).Decode(&metricRequest); err != nil {
+			handleError(c, err, log)
+			return
+		}
+
+		log.Info().Msg("Поступил запрос на обработку метрики...")
+
+		gaugeDto, err := createGaugeDtoFromMetricRequest(metricRequest)
 		if err != nil {
 			handleError(c, err, log)
 			return
@@ -85,6 +114,45 @@ func HandleMetricGet(metricService service.MetricService) gin.HandlerFunc {
 		c.String(http.StatusOK, result)
 
 		c.Status(http.StatusOK)
+	}
+}
+
+func HandleMetricGetV2(metricService service.MetricService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := utils.FromContext(c.Request.Context())
+		var metricRequest dto.MetricsRequest
+		if err := json.NewDecoder(c.Request.Body).Decode(&metricRequest); err != nil {
+			handleError(c, err, log)
+			return
+		}
+
+		metric, err := metricService.GetMetric(c.Request.Context(), metricRequest.MType, metricRequest.ID)
+
+		if err != nil {
+			handleError(c, err, log)
+			return
+		}
+
+		var delta *int64
+		var value *float64
+
+		if metric.MetricType == constants.GaugeMetricType {
+			value = &metric.Gauge
+		} else if metric.MetricType == constants.CounterMetricType {
+			delta = &metric.Counter
+		}
+
+		response := dto.MetricsResponse{
+			ID:    metric.MetricName,
+			MType: metric.MetricType,
+			Delta: delta,
+			Value: value,
+		}
+
+		c.JSON(http.StatusOK, &response)
+
+		log.Info().Msg("Метрика успешно получена")
+
 	}
 }
 
@@ -141,6 +209,37 @@ func createGaugeDto(c *gin.Context) (*dto.MetricDto, error) {
 			return nil, fmt.Errorf("%w %w", servererror.ErrNotValidMetricValue, err)
 		}
 		result.Counter = metricValue
+	}
+
+	return &result, nil
+}
+
+func createGaugeDtoFromMetricRequest(request dto.MetricsRequest) (*dto.MetricDto, error) {
+	metricType := request.MType
+	if metricType != constants.GaugeMetricType && metricType != constants.CounterMetricType {
+		return nil, servererror.ErrNotAllowedMetricType
+	}
+
+	metricName := request.ID
+	if metricName == "" {
+		return nil, servererror.ErrNotValidMetricName
+	}
+
+	var gaugeVal float64
+	if request.Value != nil {
+		gaugeVal = *request.Value
+	}
+
+	var deltaVal int64
+	if request.Delta != nil {
+		deltaVal = *request.Delta
+	}
+
+	var result = dto.MetricDto{
+		MetricType: metricType,
+		MetricName: metricName,
+		Gauge:      gaugeVal,
+		Counter:    deltaVal,
 	}
 
 	return &result, nil

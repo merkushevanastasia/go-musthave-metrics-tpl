@@ -2,7 +2,6 @@ package agent
 
 import (
 	"errors"
-	"strconv"
 
 	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
@@ -16,13 +15,17 @@ var metricServerClient *resty.Client
 func SendAll(values *dto.MetricCollection) {
 	log.Info().Msg("Отправляем метрики на сервер...")
 	for metricName, metricValue := range values.Metrics {
-		var valueStr string
+		var request dto.MetricsRequest
 		if metricValue.MetricType == constants.CounterMetricType {
-			valueStr = strconv.FormatInt(metricValue.Counter, 10)
+			request = dto.MetricsRequest{ID: metricName,
+				MType: metricValue.MetricType,
+				Delta: &metricValue.Counter}
 		} else {
-			valueStr = strconv.FormatFloat(metricValue.Gauge, 'f', -1, 64)
+			request = dto.MetricsRequest{ID: metricName,
+				MType: metricValue.MetricType,
+				Value: &metricValue.Gauge}
 		}
-		err := send(metricValue.MetricType, metricName, valueStr)
+		err := send(request)
 		if err != nil {
 			log.Error().Any("err", err).Msg("Произошла ошибка")
 		}
@@ -31,17 +34,13 @@ func SendAll(values *dto.MetricCollection) {
 
 }
 
-func send(metricType string, metricName string, metricValue string) error {
+func send(request dto.MetricsRequest) error {
 
-	log.Debug().Any("Метрика", metricName).Msg("Отправляется ")
+	log.Debug().Any("Метрика", request.ID).Msg("Отправляется ")
 	resp, err := metricServerClient.R().
-		SetHeader("Content-Type", "text/plain").
-		SetPathParams(map[string]string{
-			"type":  metricType,
-			"name":  metricName,
-			"value": metricValue,
-		}).
-		Post("/update/{type}/{name}/{value}")
+		SetHeader("Content-Type", "application/json").
+		SetBody(request).
+		Post("/update")
 
 	if err != nil {
 		return err
