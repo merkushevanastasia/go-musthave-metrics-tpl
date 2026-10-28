@@ -22,9 +22,9 @@ var MetricTypePathKey = "metric_type"
 
 func SetUpRoutes(router *gin.Engine, metricService service.MetricService) {
 	pathUpdate := fmt.Sprintf("/update/:%s/:%s/:%s", MetricTypePathKey, MetricNamePathKey, MetricValuePathKey)
-	pathUpdateV2 := fmt.Sprintf("/update")
+	pathUpdateV2 := "/update"
 	pathGet := fmt.Sprintf("/value/:%s/:%s", MetricTypePathKey, MetricNamePathKey)
-	pathGetV2 := fmt.Sprintf("/value")
+	pathGetV2 := "/value"
 	router.POST(pathUpdate, HandleMetricUpdate(metricService))
 	router.GET(pathGet, HandleMetricGet(metricService))
 	router.POST(pathGetV2, HandleMetricGetV2(metricService))
