@@ -141,7 +141,6 @@ func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 	}
 
 	contentType := g.Header().Get("Content-Type")
-
 	if g.clientSupportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")) {
 		g.shouldCompress = true
 		g.Header().Set("Content-Encoding", "gzip")
@@ -154,9 +153,17 @@ func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 }
 
 func (g *gzipResponseWriter) Write(b []byte) (int, error) {
-
 	if !g.headerWritten {
-		g.WriteHeader(g.ResponseWriter.Status())
+		contentType := g.Header().Get("Content-Type")
+		if g.clientSupportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")) {
+			g.shouldCompress = true
+			g.Header().Set("Content-Encoding", "gzip")
+			g.Header().Add("Vary", "Accept-Encoding")
+			g.gzWriter = gzip.NewWriter(g.ResponseWriter)
+		}
+
+		g.ResponseWriter.WriteHeader(g.ResponseWriter.Status())
+		g.headerWritten = true
 	}
 
 	if g.shouldCompress {
