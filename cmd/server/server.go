@@ -135,7 +135,6 @@ func (g *gzipResponseWriter) Close() error {
 	}
 	return nil
 }
-
 func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 	if g.headerWritten {
 		return
@@ -143,7 +142,6 @@ func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 
 	contentType := g.Header().Get("Content-Type")
 
-	// Проверяем типы контента: сжимаем только JSON и HTML
 	if g.clientSupportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")) {
 		g.shouldCompress = true
 		g.Header().Set("Content-Encoding", "gzip")
@@ -156,8 +154,9 @@ func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 }
 
 func (g *gzipResponseWriter) Write(b []byte) (int, error) {
+
 	if !g.headerWritten {
-		g.WriteHeader(http.StatusOK)
+		g.WriteHeader(g.ResponseWriter.Status())
 	}
 
 	if g.shouldCompress {
