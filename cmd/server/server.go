@@ -123,9 +123,10 @@ func (g *gzipReadCloser) Close() error {
 
 type gzipResponseWriter struct {
 	gin.ResponseWriter
-	gzWriter       *gzip.Writer
-	shouldCompress bool
-	headerWritten  bool
+	gzWriter           *gzip.Writer
+	shouldCompress     bool
+	headerWritten      bool
+	clientSupportsGzip bool
 }
 
 func (g *gzipResponseWriter) WriteHeader(statusCode int) {
@@ -136,9 +137,10 @@ func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 	contentType := g.Header().Get("Content-Type")
 
 	// Проверяем типы контента: сжимаем только JSON и HTML
-	if strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html") {
+	if g.clientSupportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")) {
 		g.shouldCompress = true
 		g.Header().Set("Content-Encoding", "gzip")
+		g.Header().Add("Vary", "Accept-Encoding")
 	}
 
 	g.ResponseWriter.WriteHeader(statusCode)
@@ -163,45 +165,30 @@ func (g *gzipResponseWriter) WriteString(s string) (int, error) {
 // CustomGzipMiddleware — единое middleware для входящего и исходящего трафика
 func CustomGzipMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 1. ОПЦИОНАЛЬНОЕ РАЗАРХИВИРОВАНИЕ ВХОДЯЩЕГО ЗАПРОСА (БЕЗ ЛИМИТОВ)
+		// (Код декомпрессии входящего запроса c.Request.Body оставляем без изменений)
 		if c.GetHeader("Content-Encoding") == "gzip" {
 			gzipReader, err := gzip.NewReader(c.Request.Body)
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid gzip body"})
 				return
 			}
-
-			// Подменяем тело запроса на наш кастомный распаковывающий Reader
-			c.Request.Body = &gzipReadCloser{
-				Reader:     gzipReader,
-				gzipReader: gzipReader,
-				bodyReader: c.Request.Body,
-			}
+			defer gzipReader.Close()
+			c.Request.Body = &gzipReadCloser{Reader: gzipReader, gzipReader: gzipReader, bodyReader: c.Request.Body}
 		}
 
-		// 2. ПРОВЕРКА ПОДДЕРЖКИ СЖАТИЯ КЛИЕНТОМ
 		acceptEncoding := c.GetHeader("Accept-Encoding")
-		if !strings.Contains(acceptEncoding, "gzip") {
-			c.Next()
-			return
-		}
+		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 
-		// 3. СЖАТИЕ ИСХОДЯЩЕГО ОТВЕТА (ПРИ СОВПАДЕНИИ CONTENT-TYPE)
 		gzWriter := gzip.NewWriter(c.Writer)
-		defer func(gzWriter *gzip.Writer) {
-			err := gzWriter.Close()
-			if err != nil {
-				log.Err(err)
-			}
-		}(gzWriter) // Гарантируем сброс буферов gzip в сеть
+		defer gzWriter.Close()
 
 		customWriter := &gzipResponseWriter{
-			ResponseWriter: c.Writer,
-			gzWriter:       gzWriter,
+			ResponseWriter:     c.Writer,
+			gzWriter:           gzWriter,
+			clientSupportsGzip: supportsGzip,
 		}
 
 		c.Writer = customWriter
-
 		c.Next()
 	}
 }
