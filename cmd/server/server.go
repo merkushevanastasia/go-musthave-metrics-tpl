@@ -129,6 +129,20 @@ type gzipResponseWriter struct {
 	clientSupportsGzip bool
 }
 
+// Вспомогательный метод для проверки типов контента
+func (g *gzipResponseWriter) checkContentType() {
+	contentType := g.Header().Get("Content-Type")
+	if g.clientSupportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")) {
+		g.shouldCompress = true
+		g.Header().Set("Content-Encoding", "gzip")
+		g.Header().Add("Vary", "Accept-Encoding")
+
+		// Создаем писатель только если сжатие подтверждено
+		if g.gzWriter == nil {
+			g.gzWriter = gzip.NewWriter(g.ResponseWriter)
+		}
+	}
+}
 func (g *gzipResponseWriter) Close() error {
 	if g.shouldCompress {
 		return g.gzWriter.Close() // Закрываем gzip только если реально сжимали!
@@ -140,14 +154,7 @@ func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 		return
 	}
 
-	contentType := g.Header().Get("Content-Type")
-	if g.clientSupportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")) {
-		g.shouldCompress = true
-		g.Header().Set("Content-Encoding", "gzip")
-		g.Header().Add("Vary", "Accept-Encoding")
-		g.gzWriter = gzip.NewWriter(g.ResponseWriter)
-	}
-
+	g.checkContentType()
 	g.ResponseWriter.WriteHeader(statusCode)
 	g.headerWritten = true
 }
