@@ -129,6 +129,13 @@ type gzipResponseWriter struct {
 	clientSupportsGzip bool
 }
 
+func (g *gzipResponseWriter) Close() error {
+	if g.shouldCompress {
+		return g.gzWriter.Close() // Закрываем gzip только если реально сжимали!
+	}
+	return nil
+}
+
 func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 	if g.headerWritten {
 		return
@@ -172,7 +179,6 @@ func CustomGzipMiddleware() gin.HandlerFunc {
 				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid gzip body"})
 				return
 			}
-			defer gzipReader.Close()
 			c.Request.Body = &gzipReadCloser{Reader: gzipReader, gzipReader: gzipReader, bodyReader: c.Request.Body}
 		}
 
@@ -190,5 +196,7 @@ func CustomGzipMiddleware() gin.HandlerFunc {
 
 		c.Writer = customWriter
 		c.Next()
+		customWriter.Close()
+
 	}
 }
