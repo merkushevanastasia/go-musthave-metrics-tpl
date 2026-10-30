@@ -168,8 +168,11 @@ func (g *gzipResponseWriter) Write(b []byte) (int, error) {
 			g.Header().Add("Vary", "Accept-Encoding")
 			g.gzWriter = gzip.NewWriter(g.ResponseWriter)
 		}
-
-		g.ResponseWriter.WriteHeader(g.ResponseWriter.Status())
+		status := g.ResponseWriter.Status()
+		if status == 0 {
+			status = http.StatusOK // Исправляем дефолтный статус 0 на 200 OK
+		}
+		g.ResponseWriter.WriteHeader(status)
 		g.headerWritten = true
 	}
 
