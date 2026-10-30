@@ -1,7 +1,10 @@
 package agent
 
 import (
+	"bytes"
+	"compress/gzip"
 	"errors"
+	"fmt"
 
 	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
@@ -56,5 +59,32 @@ func send(request dto.MetricsRequest) error {
 }
 
 func InitClient(config config.Config) {
-	metricServerClient = resty.New().SetBaseURL(config.ServerURL)
+	metricServerClient = resty.New().
+		SetBaseURL(config.ServerURL).
+		SetHeader("Accept-Encoding", "gzip")
+
+	// Добавляем middleware для автоматического сжатия исходящих POST/PUT запросов с JSON
+	metricServerClient.OnBeforeRequest(func(c *resty.Client, r *resty.Request) error {
+		if r.Body == nil {
+			return nil
+		}
+		bodyBytes, err := c.JSONMarshal(r.Body)
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON before gzip: %w", err)
+		}
+
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		if _, err := gz.Write(bodyBytes); err != nil {
+			return fmt.Errorf("failed to write gzip: %w", err)
+		}
+		if err := gz.Close(); err != nil {
+			return fmt.Errorf("failed to close gzip writer: %w", err)
+		}
+
+		r.SetBody(buf.Bytes())
+		r.SetHeader("Content-Encoding", "gzip")
+
+		return nil
+	})
 }

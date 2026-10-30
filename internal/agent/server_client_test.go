@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"log"
@@ -18,25 +19,40 @@ func TestSendAllSuccess(t *testing.T) {
 
 	actualUrls := make([]string, 0)
 	actualBodys := make([]dto.MetricsRequest, 0)
+	actualEncodings := make([]string, 0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		actualUrls = append(actualUrls, r.URL.Path)
+		actualEncodings = append(actualEncodings, r.Header.Get("Content-Encoding"))
 
-		// 2. Считываем тело запроса в []byte
-		bodyBytes, err := io.ReadAll(r.Body)
+		var bodyReader = r.Body
+		defer bodyReader.Close()
+
+		if r.Header.Get("Content-Encoding") == "gzip" {
+			gzipReader, err := gzip.NewReader(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			defer gzipReader.Close()
+			bodyReader = gzipReader
+		}
+
+		// Считываем тело запроса (уже распакованное, если был gzip)
+		bodyBytes, err := io.ReadAll(bodyReader)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		defer r.Body.Close()
-		var req dto.MetricsRequest
 
+		var req dto.MetricsRequest
 		err = json.Unmarshal(bodyBytes, &req)
 		if err != nil {
-			log.Fatalf("Ошибка десериализации JSON: %v", err)
+			log.Printf("Ошибка десериализации JSON: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
 		actualBodys = append(actualBodys, req)
-
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
@@ -78,17 +94,17 @@ func TestSendAllSuccess(t *testing.T) {
 					"/update",
 				},
 				expectedBodys: []dto.MetricsRequest{
-					dto.MetricsRequest{
+					{
 						ID:    constants.Alloc,
 						MType: constants.GaugeMetricType,
 						Value: floatPtr(12345.67),
 					},
-					dto.MetricsRequest{
+					{
 						ID:    constants.HeapAlloc,
 						MType: constants.GaugeMetricType,
 						Value: floatPtr(500000),
 					},
-					dto.MetricsRequest{
+					{
 						ID:    constants.PollCount,
 						MType: constants.CounterMetricType,
 						Delta: intPtr(5),

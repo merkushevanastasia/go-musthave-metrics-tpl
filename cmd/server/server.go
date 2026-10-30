@@ -1,8 +1,11 @@
 package main
 
 import (
+	"compress/gzip"
 	"flag"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
@@ -83,6 +86,7 @@ func run() {
 	log.Info().Msg("Инициализация http-server-а")
 	// инициализируем http-server
 	router := gin.New()
+	router.Use(CustomGzipMiddleware())
 	router.Use(LoggingMiddleware())
 	router.Use(gin.Recovery())
 	fs := static.SetUpFs()
@@ -99,5 +103,105 @@ func run() {
 	err := router.Run(conf.ServerURL)
 	if err != nil {
 		log.Info().Any("error", err.Error()).Msg("Ошибка во время запуска http-сервера на порту ")
+	}
+}
+
+type gzipReadCloser struct {
+	io.Reader
+	gzipReader *gzip.Reader
+	bodyReader io.ReadCloser
+}
+
+func (g *gzipReadCloser) Close() error {
+	errGz := g.gzipReader.Close()
+	errBody := g.bodyReader.Close()
+	if errGz != nil {
+		return errGz
+	}
+	return errBody
+}
+
+type gzipResponseWriter struct {
+	gin.ResponseWriter
+	gzWriter       *gzip.Writer
+	shouldCompress bool
+	headerWritten  bool
+}
+
+func (g *gzipResponseWriter) WriteHeader(statusCode int) {
+	if g.headerWritten {
+		return
+	}
+
+	contentType := g.Header().Get("Content-Type")
+
+	// Проверяем типы контента: сжимаем только JSON и HTML
+	if strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html") {
+		g.shouldCompress = true
+		g.Header().Set("Content-Encoding", "gzip")
+	}
+
+	g.ResponseWriter.WriteHeader(statusCode)
+	g.headerWritten = true
+}
+
+func (g *gzipResponseWriter) Write(b []byte) (int, error) {
+	if !g.headerWritten {
+		g.WriteHeader(http.StatusOK)
+	}
+
+	if g.shouldCompress {
+		return g.gzWriter.Write(b)
+	}
+	return g.ResponseWriter.Write(b)
+}
+
+func (g *gzipResponseWriter) WriteString(s string) (int, error) {
+	return g.Write([]byte(s))
+}
+
+// CustomGzipMiddleware — единое middleware для входящего и исходящего трафика
+func CustomGzipMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 1. ОПЦИОНАЛЬНОЕ РАЗАРХИВИРОВАНИЕ ВХОДЯЩЕГО ЗАПРОСА (БЕЗ ЛИМИТОВ)
+		if c.GetHeader("Content-Encoding") == "gzip" {
+			gzipReader, err := gzip.NewReader(c.Request.Body)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid gzip body"})
+				return
+			}
+
+			// Подменяем тело запроса на наш кастомный распаковывающий Reader
+			c.Request.Body = &gzipReadCloser{
+				Reader:     gzipReader,
+				gzipReader: gzipReader,
+				bodyReader: c.Request.Body,
+			}
+		}
+
+		// 2. ПРОВЕРКА ПОДДЕРЖКИ СЖАТИЯ КЛИЕНТОМ
+		acceptEncoding := c.GetHeader("Accept-Encoding")
+		if !strings.Contains(acceptEncoding, "gzip") {
+			c.Next()
+			return
+		}
+
+		// 3. СЖАТИЕ ИСХОДЯЩЕГО ОТВЕТА (ПРИ СОВПАДЕНИИ CONTENT-TYPE)
+		gzWriter := gzip.NewWriter(c.Writer)
+		defer func(gzWriter *gzip.Writer) {
+			err := gzWriter.Close()
+			if err != nil {
+				log.Err(err)
+			}
+		}(gzWriter) // Гарантируем сброс буферов gzip в сеть
+
+		customWriter := &gzipResponseWriter{
+			ResponseWriter: c.Writer,
+			gzWriter:       gzWriter,
+		}
+
+		c.Writer = customWriter
+
+		c.Next()
 	}
 }
