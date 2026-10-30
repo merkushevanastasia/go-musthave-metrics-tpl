@@ -86,7 +86,7 @@ func run() {
 	log.Info().Msg("Инициализация http-server-а")
 	// инициализируем http-server
 	router := gin.New()
-	router.Use(LoggingMiddleware())
+	//router.Use(LoggingMiddleware())
 	router.Use(CustomGzipMiddleware())
 	router.Use(gin.Recovery())
 	fs := static.SetUpFs()
