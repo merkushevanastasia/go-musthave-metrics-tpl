@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"compress/gzip"
 	"flag"
 	"io"
@@ -25,7 +26,7 @@ func main() {
 	run()
 }
 
-// Внутренний враппер для логгера, который гарантирует правильный перехват WriteString для Gin
+// 1. АДАПТЕР ДЛЯ ЛОГГЕРА
 type internalLoggingWriter struct {
 	gin.ResponseWriter
 	responseData *utils.ResponseData
@@ -48,7 +49,6 @@ func (w *internalLoggingWriter) WriteString(s string) (int, error) {
 	return n, err
 }
 
-// LoggingMiddleware теперь корректно работает в связке с gzip
 func LoggingMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		start := time.Now()
@@ -66,7 +66,6 @@ func LoggingMiddleware() gin.HandlerFunc {
 			ResponseWriter: ctx.Writer,
 			responseData:   responseData,
 		}
-
 		ctx.Writer = lw
 
 		logger.Debug().
@@ -86,82 +85,35 @@ func LoggingMiddleware() gin.HandlerFunc {
 	}
 }
 
-type gzipReadCloser struct {
-	io.Reader
-	gzipReader *gzip.Reader
-	bodyReader io.ReadCloser
-}
-
-func (g *gzipReadCloser) Close() error {
-	errGz := g.gzipReader.Close()
-	errBody := g.bodyReader.Close()
-	if errGz != nil {
-		return errGz
-	}
-	return errBody
-}
-
-type gzipResponseWriter struct {
+// 2. БУФЕРИЗИРОВАННЫЙ WRITER ДЛЯ GZIP
+type gzipBufferWriter struct {
 	gin.ResponseWriter
-	gzWriter           *gzip.Writer
-	shouldCompress     bool
-	headerWritten      bool
-	clientSupportsGzip bool
+	bodyBuf    *bytes.Buffer
+	statusCode int
 }
 
-func (g *gzipResponseWriter) checkContentType() {
-	contentType := g.Header().Get("Content-Type")
-	if g.clientSupportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")) {
-		g.shouldCompress = true
-		g.Header().Set("Content-Encoding", "gzip")
-		g.Header().Add("Vary", "Accept-Encoding")
-
-		if g.gzWriter == nil {
-			g.gzWriter = gzip.NewWriter(g.ResponseWriter)
-		}
-	}
+func (w *gzipBufferWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
 }
 
-func (g *gzipResponseWriter) Close() error {
-	if g.shouldCompress && g.gzWriter != nil {
-		return g.gzWriter.Close()
-	}
-	return nil
+func (w *gzipBufferWriter) Write(b []byte) (int, error) {
+	return w.bodyBuf.Write(b)
 }
 
-func (g *gzipResponseWriter) WriteHeader(statusCode int) {
-	if g.headerWritten {
-		return
-	}
-
-	g.checkContentType()
-	g.ResponseWriter.WriteHeader(statusCode)
-	g.headerWritten = true
+func (w *gzipBufferWriter) WriteString(s string) (int, error) {
+	return w.bodyBuf.WriteString(s)
 }
 
-func (g *gzipResponseWriter) Write(b []byte) (int, error) {
-	if !g.headerWritten {
-		g.checkContentType()
-		status := g.ResponseWriter.Status()
-		if status == 0 {
-			status = http.StatusOK
-		}
-		g.ResponseWriter.WriteHeader(status)
-		g.headerWritten = true
+func (w *gzipBufferWriter) Status() int {
+	if w.statusCode == 0 {
+		return w.ResponseWriter.Status()
 	}
-
-	if g.shouldCompress && g.gzWriter != nil {
-		return g.gzWriter.Write(b)
-	}
-	return g.ResponseWriter.Write(b)
-}
-
-func (g *gzipResponseWriter) WriteString(s string) (int, error) {
-	return g.Write([]byte(s))
+	return w.statusCode
 }
 
 func CustomGzipMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Декомпрессия входящего контента (остается без изменений)
 		if c.GetHeader("Content-Encoding") == "gzip" {
 			gzipReader, err := gzip.NewReader(c.Request.Body)
 			if err != nil {
@@ -171,18 +123,43 @@ func CustomGzipMiddleware() gin.HandlerFunc {
 			c.Request.Body = &gzipReadCloser{Reader: gzipReader, gzipReader: gzipReader, bodyReader: c.Request.Body}
 		}
 
+		// Создаем буферизированный писатель
+		bufWriter := &gzipBufferWriter{
+			ResponseWriter: c.Writer,
+			bodyBuf:        bytes.NewBuffer(make([]byte, 0, 1024)),
+			statusCode:     http.StatusOK,
+		}
+
+		// Подменяем писатель для хендлеров
+		originalWriter := c.Writer
+		c.Writer = bufWriter
+
+		c.Next()
+
+		// Возвращаем оригинальный писатель назад перед отправкой данных
+		c.Writer = originalWriter
+
+		contentType := bufWriter.Header().Get("Content-Type")
 		acceptEncoding := c.GetHeader("Accept-Encoding")
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 
-		customWriter := &gzipResponseWriter{
-			ResponseWriter:     c.Writer,
-			gzWriter:           nil,
-			clientSupportsGzip: supportsGzip,
-		}
+		// Проверяем условия сжатия, когда хендлер завершил работу и заголовки ТОЧНО проставлены
+		if supportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")) {
+			bufWriter.Header().Set("Content-Encoding", "gzip")
+			bufWriter.Header().Add("Vary", "Accept-Encoding")
 
-		c.Writer = customWriter
-		c.Next()
-		customWriter.Close()
+			// Пишем статус код
+			bufWriter.ResponseWriter.WriteHeader(bufWriter.Status())
+
+			// Сжимаем накопленные байты из буфера в оригинальный ответ
+			gz := gzip.NewWriter(bufWriter.ResponseWriter)
+			_, _ = gz.Write(bufWriter.bodyBuf.Bytes())
+			_ = gz.Close()
+		} else {
+			// Отправляем данные как есть без сжатия
+			bufWriter.ResponseWriter.WriteHeader(bufWriter.Status())
+			_, _ = bufWriter.ResponseWriter.Write(bufWriter.bodyBuf.Bytes())
+		}
 	}
 }
 
@@ -203,7 +180,6 @@ func run() {
 	log.Info().Msg("Инициализация http-server-а")
 	router := gin.New()
 
-	// Включаем оба middleware в строгом порядке работы цепочки
 	router.Use(LoggingMiddleware())
 	router.Use(CustomGzipMiddleware())
 	router.Use(gin.Recovery())
@@ -222,4 +198,19 @@ func run() {
 	if err != nil {
 		log.Info().Any("error", err.Error()).Msg("Ошибка во время запуска http-сервера на порту ")
 	}
+}
+
+type gzipReadCloser struct {
+	io.Reader
+	gzipReader *gzip.Reader
+	bodyReader io.ReadCloser
+}
+
+func (g *gzipReadCloser) Close() error {
+	errGz := g.gzipReader.Close()
+	errBody := g.bodyReader.Close()
+	if errGz != nil {
+		return errGz
+	}
+	return errBody
 }
