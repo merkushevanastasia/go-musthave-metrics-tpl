@@ -148,6 +148,7 @@ func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 		g.shouldCompress = true
 		g.Header().Set("Content-Encoding", "gzip")
 		g.Header().Add("Vary", "Accept-Encoding")
+		g.gzWriter = gzip.NewWriter(g.ResponseWriter)
 	}
 
 	g.ResponseWriter.WriteHeader(statusCode)
@@ -185,12 +186,9 @@ func CustomGzipMiddleware() gin.HandlerFunc {
 		acceptEncoding := c.GetHeader("Accept-Encoding")
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 
-		gzWriter := gzip.NewWriter(c.Writer)
-		defer gzWriter.Close()
-
 		customWriter := &gzipResponseWriter{
 			ResponseWriter:     c.Writer,
-			gzWriter:           gzWriter,
+			gzWriter:           nil,
 			clientSupportsGzip: supportsGzip,
 		}
 
