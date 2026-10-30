@@ -37,6 +37,7 @@ func HandleMetricUpdate(metricService service.MetricService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		log := utils.FromContext(c.Request.Context())
+
 		log.Info().Msg("Поступил запрос на обработку метрики...")
 
 		gaugeDto, err := createGaugeDto(c)
