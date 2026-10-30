@@ -25,7 +25,30 @@ func main() {
 	run()
 }
 
-// LoggingMiddleware Здесь мы логируем начало и конец обработки любого запроса, а так же проставляем requestId в логгер
+// Внутренний враппер для логгера, который гарантирует правильный перехват WriteString для Gin
+type internalLoggingWriter struct {
+	gin.ResponseWriter
+	responseData *utils.ResponseData
+}
+
+func (w *internalLoggingWriter) WriteHeader(statusCode int) {
+	w.ResponseWriter.WriteHeader(statusCode)
+	w.responseData.Status = statusCode
+}
+
+func (w *internalLoggingWriter) Write(b []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(b)
+	w.responseData.Size += n
+	return n, err
+}
+
+func (w *internalLoggingWriter) WriteString(s string) (int, error) {
+	n, err := w.ResponseWriter.WriteString(s)
+	w.responseData.Size += n
+	return n, err
+}
+
+// LoggingMiddleware теперь корректно работает в связке с gzip
 func LoggingMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		start := time.Now()
@@ -35,13 +58,13 @@ func LoggingMiddleware() gin.HandlerFunc {
 		ctx.Request = ctx.Request.WithContext(reqCtx)
 
 		responseData := &utils.ResponseData{
-			Status: http.StatusOK, // По умолчанию 200, если хэндлер не вызовет WriteHeader явным образом
+			Status: http.StatusOK,
 			Size:   0,
 		}
 
-		lw := &utils.LoggingResponseWriter{
+		lw := &internalLoggingWriter{
 			ResponseWriter: ctx.Writer,
-			ResponseData:   responseData,
+			responseData:   responseData,
 		}
 
 		ctx.Writer = lw
@@ -55,54 +78,11 @@ func LoggingMiddleware() gin.HandlerFunc {
 		ctx.Next()
 
 		duration := time.Since(start)
-		// todo перенесла duration в ответ, потому что это логичнее.
-		// По логам важно понять, когда запрос поступил, что происходило,
-		// и чем закончился. А если лог о поступлении запроса будет после его обработки, на мой взгляд странно
 		logger.Debug().
 			Dur("duration", duration).
 			Int("size", responseData.Size).
 			Int("status", responseData.Status).
 			Msg("Обработка метода завершена. Отдаем ответ")
-
-	}
-}
-
-func run() {
-
-	conf := server.Config{LogLevel: "debug"}
-
-	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
-	flag.Parse()
-	if err := env.Parse(&conf); err != nil {
-		log.Printf("failed to parse env variables: %v", err)
-	}
-
-	// Настраиваем дефолтный логгер
-	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.LogLevel})
-	log.Debug().Any("Конфиг", conf).Msg("Содержимое конфига")
-
-	gin.SetMode(gin.ReleaseMode)
-
-	log.Info().Msg("Инициализация http-server-а")
-	// инициализируем http-server
-	router := gin.New()
-	//router.Use(LoggingMiddleware())
-	router.Use(CustomGzipMiddleware())
-	router.Use(gin.Recovery())
-	fs := static.SetUpFs()
-	router.SetHTMLTemplate(fs)
-
-	repoImpl := repository.NewMetricRepositoryImpl()
-	serviceImpl := service.NewMetricServiceImpl(repoImpl)
-
-	handler.SetUpRoutes(router, serviceImpl)
-
-	// Запуск сервера на порту
-	log.Info().Msg("Инициализация http-server-а выполнена успешно")
-
-	err := router.Run(conf.ServerURL)
-	if err != nil {
-		log.Info().Any("error", err.Error()).Msg("Ошибка во время запуска http-сервера на порту ")
 	}
 }
 
@@ -129,7 +109,6 @@ type gzipResponseWriter struct {
 	clientSupportsGzip bool
 }
 
-// Вспомогательный метод для проверки типов контента
 func (g *gzipResponseWriter) checkContentType() {
 	contentType := g.Header().Get("Content-Type")
 	if g.clientSupportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")) {
@@ -137,18 +116,19 @@ func (g *gzipResponseWriter) checkContentType() {
 		g.Header().Set("Content-Encoding", "gzip")
 		g.Header().Add("Vary", "Accept-Encoding")
 
-		// Создаем писатель только если сжатие подтверждено
 		if g.gzWriter == nil {
 			g.gzWriter = gzip.NewWriter(g.ResponseWriter)
 		}
 	}
 }
+
 func (g *gzipResponseWriter) Close() error {
-	if g.shouldCompress {
-		return g.gzWriter.Close() // Закрываем gzip только если реально сжимали!
+	if g.shouldCompress && g.gzWriter != nil {
+		return g.gzWriter.Close()
 	}
 	return nil
 }
+
 func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 	if g.headerWritten {
 		return
@@ -161,22 +141,16 @@ func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 
 func (g *gzipResponseWriter) Write(b []byte) (int, error) {
 	if !g.headerWritten {
-		contentType := g.Header().Get("Content-Type")
-		if g.clientSupportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")) {
-			g.shouldCompress = true
-			g.Header().Set("Content-Encoding", "gzip")
-			g.Header().Add("Vary", "Accept-Encoding")
-			g.gzWriter = gzip.NewWriter(g.ResponseWriter)
-		}
+		g.checkContentType()
 		status := g.ResponseWriter.Status()
 		if status == 0 {
-			status = http.StatusOK // Исправляем дефолтный статус 0 на 200 OK
+			status = http.StatusOK
 		}
 		g.ResponseWriter.WriteHeader(status)
 		g.headerWritten = true
 	}
 
-	if g.shouldCompress {
+	if g.shouldCompress && g.gzWriter != nil {
 		return g.gzWriter.Write(b)
 	}
 	return g.ResponseWriter.Write(b)
@@ -186,10 +160,8 @@ func (g *gzipResponseWriter) WriteString(s string) (int, error) {
 	return g.Write([]byte(s))
 }
 
-// CustomGzipMiddleware — единое middleware для входящего и исходящего трафика
 func CustomGzipMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// (Код декомпрессии входящего запроса c.Request.Body оставляем без изменений)
 		if c.GetHeader("Content-Encoding") == "gzip" {
 			gzipReader, err := gzip.NewReader(c.Request.Body)
 			if err != nil {
@@ -211,6 +183,43 @@ func CustomGzipMiddleware() gin.HandlerFunc {
 		c.Writer = customWriter
 		c.Next()
 		customWriter.Close()
+	}
+}
 
+func run() {
+	conf := server.Config{LogLevel: "debug"}
+
+	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
+	flag.Parse()
+	if err := env.Parse(&conf); err != nil {
+		log.Printf("failed to parse env variables: %v", err)
+	}
+
+	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.LogLevel})
+	log.Debug().Any("Конфиг", conf).Msg("Содержимое конфига")
+
+	gin.SetMode(gin.ReleaseMode)
+
+	log.Info().Msg("Инициализация http-server-а")
+	router := gin.New()
+
+	// Включаем оба middleware в строгом порядке работы цепочки
+	router.Use(LoggingMiddleware())
+	router.Use(CustomGzipMiddleware())
+	router.Use(gin.Recovery())
+
+	fs := static.SetUpFs()
+	router.SetHTMLTemplate(fs)
+
+	repoImpl := repository.NewMetricRepositoryImpl()
+	serviceImpl := service.NewMetricServiceImpl(repoImpl)
+
+	handler.SetUpRoutes(router, serviceImpl)
+
+	log.Info().Msg("Инициализация http-server-а выполнена успешно")
+
+	err := router.Run(conf.ServerURL)
+	if err != nil {
+		log.Info().Any("error", err.Error()).Msg("Ошибка во время запуска http-сервера на порту ")
 	}
 }
