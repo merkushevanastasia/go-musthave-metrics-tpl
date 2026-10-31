@@ -11,7 +11,7 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
 	servererror "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils/logging"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 )
@@ -36,7 +36,7 @@ func SetUpRoutes(router *gin.Engine, metricService service.MetricService) {
 func HandleMetricUpdate(metricService service.MetricService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		log := utils.FromContext(c.Request.Context())
+		log := logging.FromContext(c.Request.Context())
 
 		log.Info().Msg("Поступил запрос на обработку метрики...")
 
@@ -56,7 +56,7 @@ func HandleMetricUpdate(metricService service.MetricService) gin.HandlerFunc {
 
 func HandleMetricUpdateV2(metricService service.MetricService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		log := utils.FromContext(c.Request.Context())
+		log := logging.FromContext(c.Request.Context())
 		var metricRequest dto.MetricsRequest
 		if err := json.NewDecoder(c.Request.Body).Decode(&metricRequest); err != nil {
 			handleError(c, err, log)
@@ -83,7 +83,7 @@ func HandleMetricUpdateV2(metricService service.MetricService) gin.HandlerFunc {
 func HandleMetricGet(metricService service.MetricService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		log := utils.FromContext(c.Request.Context())
+		log := logging.FromContext(c.Request.Context())
 		log.Info().Msg("Поступил запрос на получение метрики...")
 
 		metricType, err := parseMetricType(c)
@@ -120,7 +120,7 @@ func HandleMetricGet(metricService service.MetricService) gin.HandlerFunc {
 
 func HandleMetricGetV2(metricService service.MetricService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		log := utils.FromContext(c.Request.Context())
+		log := logging.FromContext(c.Request.Context())
 		var metricRequest dto.MetricsRequest
 		if err := json.NewDecoder(c.Request.Body).Decode(&metricRequest); err != nil {
 			handleError(c, err, log)
@@ -161,7 +161,7 @@ func HandleMetricGetV2(metricService service.MetricService) gin.HandlerFunc {
 func HandleMetricGetAll(metricService service.MetricService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		log := utils.FromContext(c.Request.Context())
+		log := logging.FromContext(c.Request.Context())
 
 		log.Info().Msg("Поступил запрос на получение всех метрик...")
 		metrics, err := metricService.GetAll(c.Request.Context())

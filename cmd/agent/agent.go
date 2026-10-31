@@ -11,7 +11,7 @@ import (
 
 	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils/logging"
 	"github.com/caarlos0/env/v11"
 	"github.com/rs/zerolog/log"
 
@@ -34,7 +34,7 @@ func main() {
 	}
 	checkServerURL(&conf)
 
-	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.LogLevel})
+	logging.InitBaseLogger(logging.LoggerConfig{Level: conf.LogLevel})
 	log.Debug().Any("Конфиг", conf).Msg("Содержимое конфига")
 
 	// Инициаоизируем базовый клиент для запросов на сервер Метрик
