@@ -90,11 +90,12 @@ func (s *MetricServiceImpl) saveMetricsInFile() error {
 }
 
 func (s *MetricServiceImpl) RestoreMetrics() error {
-	log.Info().Msg("Начинаем восстановление из файла" + s.conf.FileStoragePath)
 
 	if !s.conf.Restore {
 		return nil
 	}
+	log.Info().Msg("Начинаем восстановление из файла" + s.conf.FileStoragePath)
+
 	data, err := os.ReadFile(s.conf.FileStoragePath)
 	if os.IsNotExist(err) {
 		log.Info().Msg("Файл хранения метрик отсутствует, загрузка пропущена")

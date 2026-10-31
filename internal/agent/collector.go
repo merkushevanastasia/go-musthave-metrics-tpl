@@ -59,5 +59,5 @@ func toEntityGauge(metricName string, value float64) dto.MetricDto {
 	return dto.MetricDto{ID: metricName, Value: &value, MType: constants.GaugeMetricType}
 }
 func toEntityCounter(metricName string, delta int64) dto.MetricDto {
-	return dto.MetricDto{ID: metricName, Delta: &delta, MType: constants.GaugeMetricType}
+	return dto.MetricDto{ID: metricName, Delta: &delta, MType: constants.CounterMetricType}
 }
