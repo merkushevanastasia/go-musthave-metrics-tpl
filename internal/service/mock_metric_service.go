@@ -3,13 +3,13 @@ package service
 import (
 	"context"
 
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
 )
 
 type MockMetricService struct {
 	UpdateMetricFunc func(ctx context.Context, dto *dto.MetricDto)
-	GetMetricFunc    func(ctx context.Context, metricType string, metricName string) (dto.MetricDto, error)
-	GetAllFunc       func(ctx context.Context) ([]dto.MetricDto, error)
+	GetMetricFunc    func(ctx context.Context, metricName string) (dto.MetricDto, error)
+	GetAllFunc       func(ctx context.Context) []dto.MetricDto
 }
 
 func (m *MockMetricService) UpdateMetric(ctx context.Context, dto *dto.MetricDto) {
@@ -18,16 +18,16 @@ func (m *MockMetricService) UpdateMetric(ctx context.Context, dto *dto.MetricDto
 	}
 }
 
-func (m *MockMetricService) GetMetric(ctx context.Context, metricType string, metricName string) (dto.MetricDto, error) {
+func (m *MockMetricService) GetMetric(ctx context.Context, metricName string) (dto.MetricDto, error) {
 	if m.GetMetricFunc != nil {
-		return m.GetMetricFunc(ctx, metricType, metricName)
+		return m.GetMetricFunc(ctx, metricName)
 	}
 	return dto.MetricDto{}, nil
 }
 
-func (m *MockMetricService) GetAll(ctx context.Context) ([]dto.MetricDto, error) {
+func (m *MockMetricService) GetAll(ctx context.Context) []dto.MetricDto {
 	if m.GetAllFunc != nil {
 		return m.GetAllFunc(ctx)
 	}
-	return nil, nil
+	return nil
 }

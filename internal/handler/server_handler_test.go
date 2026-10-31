@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -64,7 +64,7 @@ func TestHandleMetricUpdate(t *testing.T) {
 				Method: http.MethodPost,
 			},
 			want: ExpectedData{
-				Code:        404,
+				Code:        400,
 				ContentType: "text/plain; charset=utf-8",
 				Response:    "в запросе отсутствует имя метрики",
 			},
@@ -112,7 +112,7 @@ func TestHandleMetricUpdateV2(t *testing.T) {
 		ContentType string
 	}
 	type InputData struct {
-		Request dto.MetricsRequest
+		Request dto.MetricDto
 		Method  string
 	}
 
@@ -124,7 +124,7 @@ func TestHandleMetricUpdateV2(t *testing.T) {
 		{
 			name: "TestHandleMetricUpdateGaugeOk",
 			input: InputData{
-				Request: dto.MetricsRequest{
+				Request: dto.MetricDto{
 					ID:    "NameMetric",
 					MType: "gauge",
 					Value: floatPtr(10.0),
@@ -140,7 +140,7 @@ func TestHandleMetricUpdateV2(t *testing.T) {
 		{
 			name: "TestHandleMetricUpdateCounterOk",
 			input: InputData{
-				Request: dto.MetricsRequest{
+				Request: dto.MetricDto{
 					ID:    "NameMetric",
 					MType: "counter",
 					Value: floatPtr(10.0),
@@ -156,7 +156,7 @@ func TestHandleMetricUpdateV2(t *testing.T) {
 		{
 			name: "TestHandleMetricUpdateMetricNameError",
 			input: InputData{
-				Request: dto.MetricsRequest{
+				Request: dto.MetricDto{
 					ID:    "",
 					MType: "counter",
 					Value: floatPtr(10.0),
@@ -164,7 +164,7 @@ func TestHandleMetricUpdateV2(t *testing.T) {
 				Method: http.MethodPost,
 			},
 			want: ExpectedData{
-				Code:        404,
+				Code:        400,
 				ContentType: "text/plain; charset=utf-8",
 				Response:    "в запросе отсутствует имя метрики",
 			},

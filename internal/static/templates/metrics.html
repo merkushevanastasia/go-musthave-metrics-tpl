@@ -15,12 +15,12 @@
     <tbody>
     {{range .Metrics}}
     <tr>
-        <td>{{.MetricName}}</td>
+        <td>{{.ID}}</td>
         <td>
             {{if eq .MetricType "gauge"}}
-            {{.Gauge}}
+            {{.Value}}
             {{else if eq .MetricType "counter"}}
-            {{.Counter}}
+            {{.Delta}}
             {{else}}
             Неизвестный тип
             {{end}}

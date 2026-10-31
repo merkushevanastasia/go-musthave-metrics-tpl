@@ -11,14 +11,14 @@ import (
 
 	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
+	dto2 "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSendAllSuccess(t *testing.T) {
 
 	actualUrls := make([]string, 0)
-	actualBodys := make([]dto.MetricsRequest, 0)
+	actualBodys := make([]dto2.MetricDto, 0)
 	actualEncodings := make([]string, 0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		actualUrls = append(actualUrls, r.URL.Path)
@@ -44,7 +44,7 @@ func TestSendAllSuccess(t *testing.T) {
 			return
 		}
 
-		var req dto.MetricsRequest
+		var req dto2.MetricDto
 		err = json.Unmarshal(bodyBytes, &req)
 		if err != nil {
 			log.Printf("Ошибка десериализации JSON: %v", err)
@@ -60,10 +60,10 @@ func TestSendAllSuccess(t *testing.T) {
 	InitClient(config.Config{ServerURL: ts.URL})
 
 	type args struct {
-		values        *dto.MetricCollection
+		values        *dto2.MetricCollection
 		baseURL       string
 		expectedPaths []string
-		expectedBodys []dto.MetricsRequest
+		expectedBodys []dto2.MetricDto
 	}
 	tests := []struct {
 		name string
@@ -72,19 +72,22 @@ func TestSendAllSuccess(t *testing.T) {
 		{
 			name: "Успешно отправлены все метрики",
 			args: args{
-				values: &dto.MetricCollection{
-					Metrics: map[string]dto.MetricDto{
+				values: &dto2.MetricCollection{
+					Metrics: map[string]dto2.MetricDto{
 						constants.Alloc: {
-							MetricType: constants.GaugeMetricType,
-							Gauge:      12345.67,
+							MType: constants.GaugeMetricType,
+							Value: floatPtr(12345.67),
+							ID:    constants.Alloc,
 						},
 						constants.HeapAlloc: {
-							MetricType: constants.GaugeMetricType,
-							Gauge:      500000,
+							MType: constants.GaugeMetricType,
+							Value: floatPtr(500000),
+							ID:    constants.HeapAlloc,
 						},
 						constants.PollCount: {
-							MetricType: constants.CounterMetricType,
-							Counter:    5,
+							MType: constants.CounterMetricType,
+							Delta: intPtr(5),
+							ID:    constants.PollCount,
 						},
 					},
 				},
@@ -93,7 +96,7 @@ func TestSendAllSuccess(t *testing.T) {
 					"/update",
 					"/update",
 				},
-				expectedBodys: []dto.MetricsRequest{
+				expectedBodys: []dto2.MetricDto{
 					{
 						ID:    constants.Alloc,
 						MType: constants.GaugeMetricType,

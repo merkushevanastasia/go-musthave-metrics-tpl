@@ -3,45 +3,35 @@ package repository
 import (
 	"context"
 
+	entity "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/entity"
 	"github.com/stretchr/testify/mock"
 )
 
+// MockMetricRepository является моком для интерфейса MetricRepository
 type MockMetricRepository struct {
 	mock.Mock
 }
 
-func (m *MockMetricRepository) UpdateGauge(ctx context.Context, name string, value float64) {
-	m.Called(ctx, name, value)
+// Update имитирует обновление метрики в репозитории
+func (m *MockMetricRepository) Update(ctx context.Context, metricEntity entity.MetricEntity) {
+	m.Called(ctx, metricEntity)
 }
 
-func (m *MockMetricRepository) UpdateCounter(ctx context.Context, name string, value int64) {
-	m.Called(ctx, name, value)
+// Get имитирует получение метрики по имени
+func (m *MockMetricRepository) Get(ctx context.Context, metricName string) (entity.MetricEntity, error) {
+	args := m.Called(ctx, metricName)
+
+	// Возвращаем объект и ошибку, которые мы настроим в тесте
+	return args.Get(0).(entity.MetricEntity), args.Error(1)
 }
 
-func (m *MockMetricRepository) GetGauge(ctx context.Context, name string) (float64, error) {
-	args := m.Called(ctx, name)
-	// args.Get(0) возвращает float64, args.Error(1) возвращает ошибку
-	return args.Get(0).(float64), args.Error(1)
-}
-
-func (m *MockMetricRepository) GetCounter(ctx context.Context, name string) (int64, error) {
-	args := m.Called(ctx, name)
-	// args.Get(0) возвращает int64, args.Error(1) возвращает ошибку
-	return args.Get(0).(int64), args.Error(1)
-}
-
-func (m *MockMetricRepository) GetAll(ctx context.Context) (map[string]float64, map[string]int64) {
+// GetAll имитирует получение всех метрик
+func (m *MockMetricRepository) GetAll(ctx context.Context) map[string]entity.MetricEntity {
 	args := m.Called(ctx)
 
-	var gauges map[string]float64
-	if args.Get(0) != nil {
-		gauges = args.Get(0).(map[string]float64)
+	// Безопасное приведение типа для map
+	if args.Get(0) == nil {
+		return nil
 	}
-
-	var counters map[string]int64
-	if args.Get(1) != nil {
-		counters = args.Get(1).(map[string]int64)
-	}
-
-	return gauges, counters
+	return args.Get(0).(map[string]entity.MetricEntity)
 }

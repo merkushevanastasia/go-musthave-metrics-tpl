@@ -7,8 +7,7 @@ import (
 	"fmt"
 
 	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
 	"github.com/go-resty/resty/v2"
 	"github.com/rs/zerolog/log"
 )
@@ -17,18 +16,8 @@ var metricServerClient *resty.Client
 
 func SendAll(values *dto.MetricCollection) {
 	log.Info().Msg("Отправляем метрики на сервер...")
-	for metricName, metricValue := range values.Metrics {
-		var request dto.MetricsRequest
-		if metricValue.MetricType == constants.CounterMetricType {
-			request = dto.MetricsRequest{ID: metricName,
-				MType: metricValue.MetricType,
-				Delta: &metricValue.Counter}
-		} else {
-			request = dto.MetricsRequest{ID: metricName,
-				MType: metricValue.MetricType,
-				Value: &metricValue.Gauge}
-		}
-		err := send(request)
+	for _, metric := range values.Metrics {
+		err := send(metric)
 		if err != nil {
 			log.Error().Any("err", err).Msg("Произошла ошибка")
 		}
@@ -37,7 +26,7 @@ func SendAll(values *dto.MetricCollection) {
 
 }
 
-func send(request dto.MetricsRequest) error {
+func send(request dto.MetricDto) error {
 
 	log.Debug().Any("Метрика", request.ID).Msg("Отправляется ")
 	resp, err := metricServerClient.R().

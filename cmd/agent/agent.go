@@ -10,7 +10,7 @@ import (
 	"time"
 
 	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils/logging"
 	"github.com/caarlos0/env/v11"
 	"github.com/rs/zerolog/log"
@@ -40,7 +40,7 @@ func main() {
 	// Инициаоизируем базовый клиент для запросов на сервер Метрик
 	agent.InitClient(conf)
 
-	metrics := dto.NewMetricCollection()
+	metrics := dto.NewMetricDtoCollection()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

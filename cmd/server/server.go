@@ -20,6 +20,11 @@ func main() {
 	run()
 }
 
+type Deps struct {
+	MetricRepository repository.MetricRepository
+	MetricService    service.MetricService
+}
+
 func run() {
 	conf := server.Config{LogLevel: "debug"}
 
@@ -37,7 +42,6 @@ func run() {
 	log.Info().Msg("Инициализация http-server-а")
 	router := gin.New()
 
-	// Включаем оба middleware в строгом порядке работы цепочки
 	router.Use(middleware.MultipleReadMiddleware())
 	router.Use(middleware.CompressMiddleware())
 	router.Use(middleware.LoggingMiddleware())
@@ -46,15 +50,23 @@ func run() {
 	fs := static.SetUpFs()
 	router.SetHTMLTemplate(fs)
 
-	repoImpl := repository.NewMetricRepositoryImpl()
-	serviceImpl := service.NewMetricServiceImpl(repoImpl)
+	deps := initDeps()
 
-	handler.SetUpRoutes(router, serviceImpl)
+	handler.SetUpRoutes(router, deps.MetricService)
 
 	log.Info().Msg("Инициализация http-server-а выполнена успешно")
 
 	err := router.Run(conf.ServerURL)
 	if err != nil {
 		log.Info().Any("error", err.Error()).Msg("Ошибка во время запуска http-сервера на порту ")
+	}
+}
+
+func initDeps() Deps {
+	repoImpl := repository.NewMetricRepositoryImpl()
+	serviceImpl := service.NewMetricServiceImpl(repoImpl)
+	return Deps{
+		MetricRepository: repoImpl,
+		MetricService:    serviceImpl,
 	}
 }

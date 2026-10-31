@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/mapper"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
+	dto2 "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/entity"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,9 +21,9 @@ func TestMetricServiceUpdateMetric(t *testing.T) {
 		{
 			name: "Успешная обработка Gauge Alloc",
 			inputDto: dto.MetricDto{
-				MetricName: "Alloc",
-				Gauge:      12345.67,
-				MetricType: constants.GaugeMetricType,
+				ID:    "Alloc",
+				Value: floatPtr(12345.67),
+				MType: constants.GaugeMetricType,
 			},
 		},
 	}
@@ -32,7 +34,8 @@ func TestMetricServiceUpdateMetric(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := new(repository.MockMetricRepository)
 			s := NewMetricServiceImpl(mockRepo)
-			mockRepo.On("UpdateGauge", ctx, tt.inputDto.MetricName, tt.inputDto.Gauge).Return().Once()
+			entity := mapper.MapToEntity(tt.inputDto)
+			mockRepo.On("Update", ctx, entity).Return().Once()
 			s.UpdateMetric(ctx, &tt.inputDto)
 			mockRepo.AssertExpectations(t)
 		})
@@ -42,25 +45,24 @@ func TestMetricServiceUpdateMetric(t *testing.T) {
 func TestMetricServiceGet(t *testing.T) {
 
 	tests := []struct {
-		name            string
-		metricName      string
-		metricType      string
-		expectedCounter int64
-		expectedGauge   float64
+		name         string
+		metricEntity dto2.MetricEntity
 	}{
 		{
-			name:            "Успешная обработка Gauge Alloc",
-			metricName:      constants.Alloc,
-			metricType:      constants.GaugeMetricType,
-			expectedCounter: 0,
-			expectedGauge:   12345.67,
+			name: "Успешная обработка Gauge Alloc",
+			metricEntity: dto2.MetricEntity{
+				ID:    constants.Alloc,
+				MType: constants.GaugeMetricType,
+				Value: floatPtr(12345.67),
+			},
 		},
 		{
-			name:            "Успешная обработка Gauge Alloc",
-			metricName:      constants.RandomValue,
-			metricType:      constants.CounterMetricType,
-			expectedCounter: 100,
-			expectedGauge:   0,
+			name: "Успешная обработка Gauge Alloc",
+			metricEntity: dto2.MetricEntity{
+				ID:    constants.RandomValue,
+				MType: constants.CounterMetricType,
+				Delta: intPtr(0),
+			},
 		},
 	}
 
@@ -70,21 +72,25 @@ func TestMetricServiceGet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := new(repository.MockMetricRepository)
 			s := NewMetricServiceImpl(mockRepo)
-			if tt.metricType == constants.GaugeMetricType {
-				mockRepo.On("GetGauge", ctx, tt.metricName).Return(tt.expectedGauge, nil)
-			} else {
-				mockRepo.On("GetCounter", ctx, tt.metricName).Return(tt.expectedCounter, nil)
+			if tt.metricEntity.MType == constants.GaugeMetricType {
+				mockRepo.On("GetMetric", ctx, tt.metricEntity.ID).Return(tt.metricEntity, nil)
 			}
-			metric, err := s.GetMetric(ctx, tt.metricType, tt.metricName)
+			metric, err := s.GetMetric(ctx, tt.metricEntity.ID)
 			if err != nil {
 				return
 			}
 
-			assert.Equal(t, tt.metricType, metric.MetricType)
-			assert.Equal(t, tt.expectedGauge, metric.Gauge)
-			assert.Equal(t, tt.expectedCounter, metric.Counter)
-			assert.Equal(t, tt.metricName, metric.MetricName)
+			assert.Equal(t, tt.metricEntity.MType, metric.MType)
+			assert.Equal(t, tt.metricEntity.Value, metric.Value)
+			assert.Equal(t, tt.metricEntity.Delta, metric.Delta)
+			assert.Equal(t, tt.metricEntity.ID, metric.ID)
 			mockRepo.AssertExpectations(t)
 		})
 	}
+}
+func floatPtr(v float64) *float64 {
+	return new(v)
+}
+func intPtr(v int64) *int64 {
+	return new(v)
 }

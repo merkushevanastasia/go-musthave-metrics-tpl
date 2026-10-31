@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
 )
 
 func TestUpdate(t *testing.T) {
@@ -79,26 +79,26 @@ func TestUpdate(t *testing.T) {
 					metricName == constants.NumGC ||
 					metricName == constants.RandomValue
 				if metricType == constants.GaugeMetricType {
-					if !canBeZero && val.Gauge <= 0 {
-						t.Errorf("Метрика %s должна быть больше 0, но получили %f", metricName, val.Gauge)
+					if !canBeZero && *val.Value <= 0 {
+						t.Errorf("Метрика %s должна быть больше 0, но получили %f", metricName, *val.Value)
 					}
 				}
 
 				if metricType == constants.CounterMetricType {
-					if !canBeZero && val.Counter <= 0 {
-						t.Errorf("Метрика %s должна быть больше 0, но получили %d", metricName, val.Counter)
+					if !canBeZero && *val.Delta <= 0 {
+						t.Errorf("Метрика %s должна быть больше 0, но получили %d", metricName, *val.Delta)
 					}
 				}
 			}
 
-			if currentValues.Metrics[constants.PollCount].Counter != 1 {
-				t.Errorf("После первого Update ожидался PollCount = 1, получили %d", currentValues.Metrics[constants.PollCount].Counter)
+			if *currentValues.Metrics[constants.PollCount].Delta != 1 {
+				t.Errorf("После первого Update ожидался PollCount = 1, получили %d", *currentValues.Metrics[constants.PollCount].Delta)
 			}
 			// Вызываем Update второй раз, чтобы проверить логику инкремента
 			Update(currentValues)
 
-			if currentValues.Metrics[constants.PollCount].Counter != 2 {
-				t.Errorf("После второго Update ожидался PollCount = 2, получили %d", currentValues.Metrics[constants.PollCount].Counter)
+			if *currentValues.Metrics[constants.PollCount].Delta != 2 {
+				t.Errorf("После второго Update ожидался PollCount = 2, получили %d", *currentValues.Metrics[constants.PollCount].Delta)
 			}
 		})
 	}
