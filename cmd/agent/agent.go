@@ -25,7 +25,7 @@ func main() {
 	// Получаем настройки, переданные в аргументах запуска
 	conf := config.Config{LogLevel: "debug"}
 
-	flag.StringVar(&conf.ServerURL, "a", "localhost:42395", "server url")
+	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
 	flag.IntVar(&conf.ReportInterval, "r", 10, "report interval")
 	flag.IntVar(&conf.PollInterval, "p", 2, "report interval")
 	flag.Parse()
