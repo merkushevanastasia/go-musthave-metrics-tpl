@@ -13,11 +13,11 @@ type MockMetricRepository struct {
 }
 
 // Update имитирует обновление метрики в репозитории
-func (m *MockMetricRepository) Update(ctx context.Context, metricEntity entity.MetricEntity) {
-	m.Called(ctx, metricEntity)
+func (m *MockMetricRepository) Update(ctx context.Context, entity entity.MetricEntity) {
+	m.Called(ctx, entity)
 }
 
-// Get имитирует получение метрики по имени
+// Get GetMetric Get имитирует получение метрики по имени
 func (m *MockMetricRepository) Get(ctx context.Context, metricName string) (entity.MetricEntity, error) {
 	args := m.Called(ctx, metricName)
 

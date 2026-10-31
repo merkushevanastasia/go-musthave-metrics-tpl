@@ -37,7 +37,6 @@ func TestSendAllSuccess(t *testing.T) {
 			bodyReader = gzipReader
 		}
 
-		// Считываем тело запроса (уже распакованное, если был gzip)
 		bodyBytes, err := io.ReadAll(bodyReader)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)

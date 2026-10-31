@@ -72,9 +72,7 @@ func TestMetricServiceGet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := new(repository.MockMetricRepository)
 			s := NewMetricServiceImpl(mockRepo)
-			if tt.metricEntity.MType == constants.GaugeMetricType {
-				mockRepo.On("GetMetric", ctx, tt.metricEntity.ID).Return(tt.metricEntity, nil)
-			}
+			mockRepo.On("Get", ctx, tt.metricEntity.ID).Return(tt.metricEntity, nil)
 			metric, err := s.GetMetric(ctx, tt.metricEntity.ID)
 			if err != nil {
 				return
