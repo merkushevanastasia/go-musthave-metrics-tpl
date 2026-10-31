@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestHandleMetricUpdate(t *testing.T) {
@@ -76,7 +77,7 @@ func TestHandleMetricUpdate(t *testing.T) {
 	router.POST("/update/:metric_type/:metric_name/:metric_value", HandleMetricUpdate(mockServiceImpl))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
+			mockServiceImpl.On("UpdateMetric", mock.Anything, mock.Anything).Return().Once()
 			request := httptest.NewRequest(tt.input.Method, tt.input.URL, nil)
 
 			w := httptest.NewRecorder()
@@ -186,6 +187,7 @@ func TestHandleMetricUpdateV2(t *testing.T) {
 			// 3. ОБЯЗАТЕЛЬНО задаем заголовок Content-Type, иначе Gin не поймет, что это JSON
 			request.Header.Set("Content-Type", "application/json")
 			router.POST("/update", HandleMetricUpdateV2(mockServiceImpl))
+			mockServiceImpl.On("UpdateMetric", mock.Anything, mock.Anything).Return().Once()
 
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, request)
