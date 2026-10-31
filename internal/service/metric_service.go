@@ -73,9 +73,7 @@ func (s *MetricServiceImpl) saveMetricsInFile() error {
 	metricsMap := s.GetAll(context.Background())
 
 	var items []dto.MetricDto
-	for _, metric := range metricsMap {
-		items = append(items, metric)
-	}
+	items = append(items, metricsMap...)
 
 	data, err := json.MarshalIndent(items, "", "  ")
 	if err != nil {

@@ -55,7 +55,7 @@ func run() {
 	router.SetHTMLTemplate(fs)
 
 	deps := initDeps(conf)
-	err := deps.MetricService.RestoreMetrics()
+	_ = deps.MetricService.RestoreMetrics()
 	if err := env.Parse(&conf); err != nil {
 		log.Printf("failed to restore: %v", err)
 	}
@@ -65,7 +65,7 @@ func run() {
 
 	log.Info().Msg("Инициализация http-server-а выполнена успешно")
 
-	err = router.Run(conf.ServerURL)
+	err := router.Run(conf.ServerURL)
 	if err != nil {
 		log.Info().Any("error", err.Error()).Msg("Ошибка во время запуска http-сервера на порту ")
 	}
