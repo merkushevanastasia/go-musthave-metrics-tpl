@@ -35,3 +35,7 @@ func (m *MockMetricRepository) GetAll(ctx context.Context) map[string]entity.Met
 	}
 	return args.Get(0).(map[string]entity.MetricEntity)
 }
+
+func (m *MockMetricRepository) Clean(ctx context.Context) {
+	m.Called(ctx)
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/mapper"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
@@ -33,7 +34,7 @@ func TestMetricServiceUpdateMetric(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := new(repository.MockMetricRepository)
-			s := NewMetricServiceImpl(mockRepo)
+			s := NewMetricServiceImpl(mockRepo, server.Config{StoreInterval: 100000, Restore: false, FileStoragePath: "/tmp"})
 			entity := mapper.MapToEntity(tt.inputDto)
 			mockRepo.On("Update", ctx, entity).Return().Once()
 			s.UpdateMetric(ctx, &tt.inputDto)
@@ -71,7 +72,7 @@ func TestMetricServiceGet(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := new(repository.MockMetricRepository)
-			s := NewMetricServiceImpl(mockRepo)
+			s := NewMetricServiceImpl(mockRepo, server.Config{StoreInterval: 100000, Restore: false, FileStoragePath: "/tmp"})
 			mockRepo.On("Get", ctx, tt.metricEntity.ID).Return(tt.metricEntity, nil)
 			metric, err := s.GetMetric(ctx, tt.metricEntity.ID)
 			if err != nil {
