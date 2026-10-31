@@ -59,10 +59,10 @@ func CompressMiddleware() gin.HandlerFunc {
 				return
 			}
 			resMulti.BodyResponse = compressBytes
+			_, _ = resMulti.ReWrite(resMulti.BodyResponse)
 		}
 
 		resMulti.ResponseWriter.WriteHeader(resMulti.Status())
-		_, _ = resMulti.ResponseWriter.Write(resMulti.BodyResponse)
 
 		log.Debug().Msg("CompressMiddleware end")
 

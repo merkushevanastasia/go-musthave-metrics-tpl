@@ -25,9 +25,11 @@ type ResponseMultiple struct {
 
 func (w *ResponseMultiple) Write(b []byte) (int, error) {
 	log.Debug().Any("ResponseMultipleValue", w).Msg("ResponseMultiple - Write")
-	//Сохраним значение ответа для многократного использования
-	w.BodyResponse = b
-
 	return w.ResponseWriter.Write(b)
+}
 
+func (w *ResponseMultiple) ReWrite(b []byte) (int, error) {
+	log.Debug().Any("ResponseMultipleValue", w).Msg("ResponseMultiple - Write")
+	w.BodyResponse = append(w.BodyResponse[:0], b...)
+	return w.ResponseWriter.Write(b)
 }
