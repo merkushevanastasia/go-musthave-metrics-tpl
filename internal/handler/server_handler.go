@@ -33,7 +33,7 @@ func handleError(c *gin.Context, err error) {
 		logger.Error().Msg(err.Error())
 
 		if errors.Is(err, servererror.ErrNotValidMetricName) {
-			c.String(http.StatusBadRequest, err.Error())
+			c.String(http.StatusNotFound, err.Error())
 			return
 		}
 

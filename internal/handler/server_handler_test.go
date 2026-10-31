@@ -65,7 +65,7 @@ func TestHandleMetricUpdate(t *testing.T) {
 				Method: http.MethodPost,
 			},
 			want: ExpectedData{
-				Code:        400,
+				Code:        404,
 				ContentType: "text/plain; charset=utf-8",
 				Response:    "в запросе отсутствует имя метрики",
 			},
@@ -165,7 +165,7 @@ func TestHandleMetricUpdateV2(t *testing.T) {
 				Method: http.MethodPost,
 			},
 			want: ExpectedData{
-				Code:        400,
+				Code:        404,
 				ContentType: "text/plain; charset=utf-8",
 				Response:    "в запросе отсутствует имя метрики",
 			},
