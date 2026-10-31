@@ -1,61 +1,90 @@
 package agent
 
 import (
+	"bytes"
+	"compress/gzip"
 	"errors"
-	"log/slog"
-	"strconv"
+	"fmt"
 
 	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
 	"github.com/go-resty/resty/v2"
+	"github.com/rs/zerolog/log"
 )
 
 var metricServerClient *resty.Client
 
 func SendAll(values *dto.MetricCollection) {
-	slog.Info("Отправляем метрики на сервер...")
+	log.Info().Msg("Отправляем метрики на сервер...")
 	for metricName, metricValue := range values.Metrics {
-		var valueStr string
+		var request dto.MetricsRequest
 		if metricValue.MetricType == constants.CounterMetricType {
-			valueStr = strconv.FormatInt(metricValue.Counter, 10)
+			request = dto.MetricsRequest{ID: metricName,
+				MType: metricValue.MetricType,
+				Delta: &metricValue.Counter}
 		} else {
-			valueStr = strconv.FormatFloat(metricValue.Gauge, 'f', -1, 64)
+			request = dto.MetricsRequest{ID: metricName,
+				MType: metricValue.MetricType,
+				Value: &metricValue.Gauge}
 		}
-		err := send(metricValue.MetricType, metricName, valueStr)
+		err := send(request)
 		if err != nil {
-			slog.Error("Произошла ошибка", slog.Any("err", err))
+			log.Error().Any("err", err).Msg("Произошла ошибка")
 		}
 	}
-	slog.Info("Отправка метрик на сервер завершена...")
+	log.Info().Msg("Отправка метрик на сервер завершена...")
 
 }
 
-func send(metricType string, metricName string, metricValue string) error {
+func send(request dto.MetricsRequest) error {
 
-	slog.Debug("Отправляется ", slog.Any("Метрика", metricName))
+	log.Debug().Any("Метрика", request.ID).Msg("Отправляется ")
 	resp, err := metricServerClient.R().
-		SetHeader("Content-Type", "text/plain").
-		SetPathParams(map[string]string{
-			"type":  metricType,
-			"name":  metricName,
-			"value": metricValue,
-		}).
-		Post("/update/{type}/{name}/{value}")
+		SetHeader("Content-Type", "application/json").
+		SetBody(request).
+		Post("/update")
 
 	if err != nil {
 		return err
 	}
 
 	if resp.IsError() {
-		slog.Error("Сервер вернул ошибку", "status", resp.Status())
+		log.Error().Any("status", resp.Status()).Msg("Сервер вернул ошибку")
 		return errors.New("Вернулсся ошибочный код" + resp.Status())
 	}
 
-	slog.Info("Отправлено..")
+	log.Info().Msg("Отправлено..")
 	return nil
 }
 
 func InitClient(config config.Config) {
-	metricServerClient = resty.New().SetBaseURL(config.ServerURL)
+	metricServerClient = resty.New().
+		SetBaseURL(config.ServerURL).
+		SetHeader("Accept-Encoding", "gzip")
+
+	// Добавляем middleware для автоматического сжатия исходящих POST/PUT запросов с JSON
+	metricServerClient.OnBeforeRequest(func(c *resty.Client, r *resty.Request) error {
+		if r.Body == nil {
+			return nil
+		}
+		bodyBytes, err := c.JSONMarshal(r.Body)
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON before gzip: %w", err)
+		}
+
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		if _, err := gz.Write(bodyBytes); err != nil {
+			return fmt.Errorf("failed to write gzip: %w", err)
+		}
+		if err := gz.Close(); err != nil {
+			return fmt.Errorf("failed to close gzip writer: %w", err)
+		}
+
+		r.SetBody(buf.Bytes())
+		r.SetHeader("Content-Encoding", "gzip")
+
+		return nil
+	})
 }

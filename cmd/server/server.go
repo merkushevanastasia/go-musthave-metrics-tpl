@@ -2,55 +2,47 @@ package main
 
 import (
 	"flag"
-	"log/slog"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/handler"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/middleware"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/static"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils/logging"
+	"github.com/caarlos0/env/v11"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	log "github.com/rs/zerolog/log"
 )
 
 func main() {
-	slog.Info("Запуск сервера для сбора рантайм-метрик...")
+	log.Printf("Запуск сервера для сбора рантайм-метрик...")
 	run()
 }
 
-// LoggingMiddleware Здесь мы логируем начало и конец обработки любого запроса, а так же проставляем requestId в логгер
-func LoggingMiddleware() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		reqID := uuid.New()
-		var logger = slog.Default().With("requestId", reqID)
-		logger.Debug("Входящий HTTP запрос",
-			"host", ctx.Request.Host,
-			"method", ctx.Request.Method,
-			"path", ctx.Request.URL.Path,
-		)
-		ctx.Set(utils.LoggerKey, logger)
-		ctx.Next()
-		logger.Debug("Обработка метода завершена. Отдаем ответ")
-	}
-}
-
 func run() {
-
 	conf := server.Config{LogLevel: "debug"}
 
 	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
 	flag.Parse()
+	if err := env.Parse(&conf); err != nil {
+		log.Printf("failed to parse env variables: %v", err)
+	}
 
-	// Настраиваем дефолтный логгер
-	utils.InitBaseLogger(utils.LoggerConfig{Level: conf.LogLevel})
+	logging.InitBaseLogger(logging.LoggerConfig{Level: conf.LogLevel})
+	log.Debug().Any("Конфиг", conf).Msg("Содержимое конфига")
+
 	gin.SetMode(gin.ReleaseMode)
 
-	slog.Info("Инициализация http-server-а")
-	// инициализируем http-server
+	log.Info().Msg("Инициализация http-server-а")
 	router := gin.New()
-	router.Use(LoggingMiddleware())
+
+	// Включаем оба middleware в строгом порядке работы цепочки
+	router.Use(middleware.MultipleReadMiddleware())
+	router.Use(middleware.CompressMiddleware())
+	router.Use(middleware.LoggingMiddleware())
 	router.Use(gin.Recovery())
+
 	fs := static.SetUpFs()
 	router.SetHTMLTemplate(fs)
 
@@ -59,10 +51,10 @@ func run() {
 
 	handler.SetUpRoutes(router, serviceImpl)
 
-	// Запуск сервера на порту
-	slog.Info("Инициализация http-server-а выполнена успешно")
+	log.Info().Msg("Инициализация http-server-а выполнена успешно")
+
 	err := router.Run(conf.ServerURL)
 	if err != nil {
-		slog.Error("Ошибка во время запуска http-сервера на порту ", slog.Any("err", err.Error()))
+		log.Info().Any("error", err.Error()).Msg("Ошибка во время запуска http-сервера на порту ")
 	}
 }
