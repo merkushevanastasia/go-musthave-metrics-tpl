@@ -40,7 +40,7 @@ func (repository *MetricRepositoryImpl) Update(ctx context.Context, metricEntity
 	log := logging.FromContext(ctx)
 	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик перед обновлением")
 
-	if metricEntity.MType == constants.GaugeMetricType {
+	if metricEntity.MType == constants.CounterMetricType {
 		current, isPresent := repository.Storage.Metrics[metricEntity.ID]
 		if isPresent {
 
