@@ -1,4 +1,4 @@
-package request_response
+package requestresponse
 
 import (
 	"compress/gzip"
@@ -25,11 +25,18 @@ type ResponseMultiple struct {
 
 func (w *ResponseMultiple) Write(b []byte) (int, error) {
 	log.Debug().Any("ResponseMultipleValue", w).Msg("ResponseMultiple - Write")
-	return w.ResponseWriter.Write(b)
+	w.BodyResponse = append(w.BodyResponse, b...)
+	return len(b), nil
 }
 
 func (w *ResponseMultiple) ReWrite(b []byte) (int, error) {
 	log.Debug().Any("ResponseMultipleValue", w).Msg("ResponseMultiple - Write")
-	w.BodyResponse = append(w.BodyResponse[:0], b...)
-	return w.ResponseWriter.Write(b)
+	w.BodyResponse = b
+	return len(b), nil
+}
+
+func (w *ResponseMultiple) FlushCustom() error {
+	w.ResponseWriter.WriteHeader(w.Status())
+	_, err := w.ResponseWriter.Write(w.BodyResponse)
+	return err
 }

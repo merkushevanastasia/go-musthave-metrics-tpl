@@ -1,4 +1,4 @@
-package request_response
+package requestresponse
 
 import (
 	"bytes"

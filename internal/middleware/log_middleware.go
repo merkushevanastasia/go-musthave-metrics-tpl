@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/middleware/request_response"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/middleware/requestresponse"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -19,7 +19,7 @@ func LoggingMiddleware() gin.HandlerFunc {
 		ctx.Request = ctx.Request.WithContext(reqCtx)
 
 		// 2. Инициализируем наш объект
-		reqMulti, ok := ctx.Request.Body.(*request_response.RequestMultiple)
+		reqMulti, ok := ctx.Request.Body.(*requestresponse.RequestMultiple)
 
 		if !ok {
 			ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -33,7 +33,7 @@ func LoggingMiddleware() gin.HandlerFunc {
 			Msg("Входящий HTTP запрос")
 
 		ctx.Next()
-		resMulti, ok := ctx.Writer.(*request_response.ResponseMultiple)
+		resMulti, ok := ctx.Writer.(*requestresponse.ResponseMultiple)
 		if !ok {
 			ctx.AbortWithStatus(http.StatusInternalServerError)
 			return

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/middleware/request_response"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/middleware/requestresponse"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
@@ -18,7 +18,7 @@ func CompressMiddleware() gin.HandlerFunc {
 		log.Debug().Msg("CompressMiddleware start")
 
 		// Пытаемся привести c.Request.Body к нашему типу *RequestMultiple
-		reqMulti, ok := c.Request.Body.(*request_response.RequestMultiple)
+		reqMulti, ok := c.Request.Body.(*requestresponse.RequestMultiple)
 
 		if !ok {
 			c.AbortWithStatus(http.StatusInternalServerError)
@@ -43,13 +43,13 @@ func CompressMiddleware() gin.HandlerFunc {
 		c.Next()
 
 		// Пытаемся привести c.Writer к нашему типу *ResponseMultiple
-		resMulti, ok := c.Writer.(*request_response.ResponseMultiple)
+		resMulti, ok := c.Writer.(*requestresponse.ResponseMultiple)
 		if !ok {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
 		contentType := resMulti.Header().Get("Content-Type")
-
+		resMulti.ContentType = contentType
 		if strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html") {
 			resMulti.Header().Set("Content-Encoding", "gzip")
 			resMulti.Header().Add("Vary", "Accept-Encoding")
@@ -59,11 +59,10 @@ func CompressMiddleware() gin.HandlerFunc {
 				return
 			}
 			resMulti.BodyResponse = compressBytes
-			_, _ = resMulti.ReWrite(resMulti.BodyResponse)
+			_, _ = resMulti.ReWrite(compressBytes)
 		}
 
 		resMulti.ResponseWriter.WriteHeader(resMulti.Status())
-
 		log.Debug().Msg("CompressMiddleware end")
 
 	}
