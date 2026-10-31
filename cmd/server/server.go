@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
@@ -29,6 +30,9 @@ func run() {
 	conf := server.Config{LogLevel: "debug"}
 
 	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
+	flag.IntVar(&conf.StoreInterval, "i", 10, "store interval in seconds")
+	flag.StringVar(&conf.FileStoragePath, "f", "/tmp/metrics.json", "file storage path")
+	flag.BoolVar(&conf.Restore, "r", false, "restore previous values from file")
 	flag.Parse()
 	if err := env.Parse(&conf); err != nil {
 		log.Printf("failed to parse env variables: %v", err)
@@ -50,21 +54,26 @@ func run() {
 	fs := static.SetUpFs()
 	router.SetHTMLTemplate(fs)
 
-	deps := initDeps()
+	deps := initDeps(conf)
+	err := deps.MetricService.RestoreMetrics()
+	if err := env.Parse(&conf); err != nil {
+		log.Printf("failed to restore: %v", err)
+	}
+	deps.MetricService.StartStoreTicker(context.Background())
 
 	handler.SetUpRoutes(router, deps.MetricService)
 
 	log.Info().Msg("Инициализация http-server-а выполнена успешно")
 
-	err := router.Run(conf.ServerURL)
+	err = router.Run(conf.ServerURL)
 	if err != nil {
 		log.Info().Any("error", err.Error()).Msg("Ошибка во время запуска http-сервера на порту ")
 	}
 }
 
-func initDeps() Deps {
+func initDeps(config server.Config) Deps {
 	repoImpl := repository.NewMetricRepositoryImpl()
-	serviceImpl := service.NewMetricServiceImpl(repoImpl)
+	serviceImpl := service.NewMetricServiceImpl(repoImpl, config)
 	return Deps{
 		MetricRepository: repoImpl,
 		MetricService:    serviceImpl,

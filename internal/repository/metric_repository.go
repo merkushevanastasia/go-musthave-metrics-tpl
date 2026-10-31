@@ -20,6 +20,7 @@ type MetricRepository interface {
 	Update(ctx context.Context, entity entity.MetricEntity)
 	Get(ctx context.Context, metricName string) (entity.MetricEntity, error)
 	GetAll(ctx context.Context) map[string]entity.MetricEntity
+	Clean(ctx context.Context)
 }
 
 type MetricRepositoryImpl struct {
@@ -42,7 +43,14 @@ func (repository *MetricRepositoryImpl) Update(ctx context.Context, metricEntity
 	if metricEntity.MType == constants.GaugeMetricType {
 		current, isPresent := repository.Storage.Metrics[metricEntity.ID]
 		if isPresent {
-			newDelta := *metricEntity.Delta + *current.Delta
+
+			var newDelta int64 = 0
+			if (current.Delta) != nil {
+				newDelta = newDelta + *current.Delta
+			}
+			if (metricEntity.Delta) != nil {
+				newDelta = newDelta + *metricEntity.Delta
+			}
 			metricEntity.Delta = &newDelta
 		}
 	}
@@ -70,4 +78,10 @@ func (repository *MetricRepositoryImpl) GetAll(ctx context.Context) map[string]e
 	log := logging.FromContext(ctx)
 	log.Debug().Msg("Получение всех метрик из хранилища")
 	return repository.Storage.Metrics
+}
+
+func (repository *MetricRepositoryImpl) Clean(ctx context.Context) {
+	log := logging.FromContext(ctx)
+	log.Debug().Msg("Очищаем")
+	repository.Storage.Metrics = make(map[string]entity.MetricEntity)
 }
