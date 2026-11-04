@@ -3,31 +3,43 @@ package service
 import (
 	"context"
 
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/dto"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
+	"github.com/stretchr/testify/mock"
 )
 
 type MockMetricService struct {
-	UpdateMetricFunc func(ctx context.Context, dto *dto.MetricDto)
-	GetMetricFunc    func(ctx context.Context, metricType string, metricName string) (dto.MetricDto, error)
-	GetAllFunc       func(ctx context.Context) ([]dto.MetricDto, error)
+	mock.Mock
 }
 
+// UpdateMetric имитирует обновление метрики
 func (m *MockMetricService) UpdateMetric(ctx context.Context, dto *dto.MetricDto) {
-	if m.UpdateMetricFunc != nil {
-		m.UpdateMetricFunc(ctx, dto)
-	}
+	m.Called(ctx, dto)
 }
 
-func (m *MockMetricService) GetMetric(ctx context.Context, metricType string, metricName string) (dto.MetricDto, error) {
-	if m.GetMetricFunc != nil {
-		return m.GetMetricFunc(ctx, metricType, metricName)
-	}
-	return dto.MetricDto{}, nil
+// GetMetric имитирует получение метрики
+func (m *MockMetricService) GetMetric(ctx context.Context, metricName string) (dto.MetricDto, error) {
+	args := m.Called(ctx, metricName)
+	return args.Get(0).(dto.MetricDto), args.Error(1)
 }
 
-func (m *MockMetricService) GetAll(ctx context.Context) ([]dto.MetricDto, error) {
-	if m.GetAllFunc != nil {
-		return m.GetAllFunc(ctx)
+// GetAll имитирует получение списка всех метрик (Был пропущен в старом моке)
+func (m *MockMetricService) GetAll(ctx context.Context) []dto.MetricDto {
+	args := m.Called(ctx)
+
+	// Безопасно проверяем на nil, если в .Return() передали пустое значение
+	if args.Get(0) == nil {
+		return nil
 	}
-	return nil, nil
+	return args.Get(0).([]dto.MetricDto)
+}
+
+// StartStoreTicker имитирует запуск таймера сброса метрик на диск
+func (m *MockMetricService) StartStoreTicker(ctx context.Context) {
+	m.Called(ctx)
+}
+
+// RestoreMetrics имитирует восстановление метрик при старте
+func (m *MockMetricService) RestoreMetrics() error {
+	args := m.Called()
+	return args.Error(0)
 }

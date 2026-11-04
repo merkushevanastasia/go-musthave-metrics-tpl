@@ -1,8 +1,8 @@
 package agent
 
 type Config struct {
-	PollInterval   int
-	ReportInterval int
-	ServerURL      string
+	PollInterval   int    `env:"POLL_INTERVAL"`
+	ReportInterval int    `env:"REPORT_INTERVAL"`
+	ServerURL      string `env:"ADDRESS"`
 	LogLevel       string
 }
