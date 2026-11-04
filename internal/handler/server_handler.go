@@ -8,7 +8,7 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	servererror "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils/logging"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,7 +27,7 @@ func SetUpRoutes(router *gin.Engine, metricService service.MetricService) {
 
 // handleError маппинг кастомной ошибки в ожидаемый ответ
 func handleError(c *gin.Context, err error) {
-	logger := logging.FromContext(c.Request.Context())
+	logger := logs.GetLoggerFromContext(c.Request.Context())
 
 	if err != nil {
 		logger.Error().Msg(err.Error())

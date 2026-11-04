@@ -9,7 +9,7 @@ import (
 	servererror "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils/logging"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,7 +17,7 @@ import (
 func HandleMetricGetV1(metricService service.MetricService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		log := logging.FromContext(c.Request.Context())
+		log := logs.GetLoggerFromContext(c.Request.Context())
 		log.Info().Msg("Поступил запрос на получение метрики...")
 
 		_, err := parseMetricTypeV1(c)
@@ -54,7 +54,7 @@ func HandleMetricGetV1(metricService service.MetricService) gin.HandlerFunc {
 func HandleMetricGetAll(metricService service.MetricService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		log := logging.FromContext(c.Request.Context())
+		log := logs.GetLoggerFromContext(c.Request.Context())
 		log.Info().Msg("Поступил запрос на получение всех метрик...")
 
 		metrics := metricService.GetAll(c.Request.Context())
@@ -70,7 +70,7 @@ func HandleMetricGetAll(metricService service.MetricService) gin.HandlerFunc {
 func HandleMetricUpdate(metricService service.MetricService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		log := logging.FromContext(c.Request.Context())
+		log := logs.GetLoggerFromContext(c.Request.Context())
 		log.Info().Msg("Поступил запрос на обработку метрики...")
 
 		gaugeDto, err := createGaugeDtoV1(c)

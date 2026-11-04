@@ -3,24 +3,16 @@ package requestresponse
 import (
 	"bytes"
 	"io"
-
-	"github.com/rs/zerolog/log"
 )
 
 type RequestMultiple struct {
 	reader *bytes.Reader
 	// Это байты запроса для многократного использования
 	RequestBody *[]byte
-	// Это информация о том, был ли сжат запрос
-	IsRequestCompress bool
-	// Тип контента
-	ContentType string
 }
 
 // Read реализует интерфейс io.Reader
 func (r *RequestMultiple) Read(p []byte) (n int, err error) {
-
-	log.Debug().Any("RequestMultipleValue", r).Msg("RequestMultiple - Read")
 
 	// Сохраняем уже прочитанные байты для повторной вычитки
 	if r.reader == nil {
