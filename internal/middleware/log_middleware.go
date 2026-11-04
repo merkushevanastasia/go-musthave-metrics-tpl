@@ -25,6 +25,13 @@ func LoggingMiddleware() gin.HandlerFunc {
 			ctx.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
+
+		logger.Info().
+			Str("host", ctx.Request.Host).
+			Str("method", ctx.Request.Method).
+			Str("path", ctx.Request.URL.Path).
+			Msg("Входящий HTTP запрос")
+
 		logger.Debug().
 			Str("host", ctx.Request.Host).
 			Str("method", ctx.Request.Method).
@@ -42,6 +49,11 @@ func LoggingMiddleware() gin.HandlerFunc {
 		// todo перенесла duration в ответ, потому что это логичнее.
 		// По логам важно понять, когда запрос поступил, что происходило,
 		// и чем закончился. А если лог о поступлении запроса будет после его обработки, на мой взгляд странно
+		logger.Info().
+			Dur("duration", duration).
+			Int("size", len(resMulti.BodyResponse)).
+			Int("status", resMulti.Status()).
+			Msg("Обработка метода завершена. Отдаем ответ")
 		logger.Debug().
 			Dur("duration", duration).
 			Int("size", len(resMulti.BodyResponse)).
