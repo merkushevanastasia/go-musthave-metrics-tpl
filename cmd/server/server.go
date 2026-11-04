@@ -55,8 +55,7 @@ func run() {
 	router.SetHTMLTemplate(fs)
 
 	deps := initDeps(conf)
-	_ = deps.MetricService.RestoreMetrics()
-	if err := env.Parse(&conf); err != nil {
+	if err := deps.MetricService.RestoreMetrics(); err != nil {
 		log.Printf("failed to restore: %v", err)
 	}
 	deps.MetricService.StartStoreTicker(context.Background())

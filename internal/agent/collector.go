@@ -23,7 +23,7 @@ func Update(metricCollection *dto.MetricCollection) {
 	metricCollection.Add(toEntityGauge(constants.Alloc, float64(m.Alloc)))
 	metricCollection.Add(toEntityGauge(constants.BuckHashSys, float64(m.BuckHashSys)))
 	metricCollection.Add(toEntityGauge(constants.Frees, float64(m.Frees)))
-	metricCollection.Add(toEntityGauge(constants.GCCPUFraction, float64(m.GCCPUFraction)))
+	metricCollection.Add(toEntityGauge(constants.GCCPUFraction, m.GCCPUFraction))
 	metricCollection.Add(toEntityGauge(constants.GCSys, float64(m.GCSys)))
 	metricCollection.Add(toEntityGauge(constants.HeapAlloc, float64(m.HeapAlloc)))
 	metricCollection.Add(toEntityGauge(constants.HeapIdle, float64(m.HeapIdle)))

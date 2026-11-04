@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
@@ -36,19 +37,21 @@ func NewMetricRepositoryImpl() *MetricRepositoryImpl {
 }
 
 func (repository *MetricRepositoryImpl) Update(ctx context.Context, metricEntity entity.MetricEntity) {
-
 	log := logging.FromContext(ctx)
+
+	repository.Storage.Mu.Lock()
+	defer repository.Storage.Mu.Unlock()
+
 	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик перед обновлением")
 
 	if metricEntity.MType == constants.CounterMetricType {
 		current, isPresent := repository.Storage.Metrics[metricEntity.ID]
 		if isPresent {
-
 			var newDelta int64 = 0
-			if (current.Delta) != nil {
+			if current.Delta != nil {
 				newDelta = newDelta + *current.Delta
 			}
-			if (metricEntity.Delta) != nil {
+			if metricEntity.Delta != nil {
 				newDelta = newDelta + *metricEntity.Delta
 			}
 			metricEntity.Delta = &newDelta
@@ -56,14 +59,15 @@ func (repository *MetricRepositoryImpl) Update(ctx context.Context, metricEntity
 	}
 	repository.Storage.Metrics[metricEntity.ID] = metricEntity
 
-	repository.Storage.Metrics[metricEntity.ID] = metricEntity
-	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик послк обновления")
-
+	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик после обновления")
 }
 
 func (repository *MetricRepositoryImpl) Get(ctx context.Context, metricName string) (entity.MetricEntity, error) {
 	log := logging.FromContext(ctx)
 	log.Debug().Str("имя метрики", metricName).Msg("Запрос значения метрики из хранилища")
+
+	repository.Storage.Mu.RLock()
+	defer repository.Storage.Mu.RUnlock()
 	currentValue, isPresent := repository.Storage.Metrics[metricName]
 
 	if isPresent {
@@ -77,11 +81,20 @@ func (repository *MetricRepositoryImpl) Get(ctx context.Context, metricName stri
 func (repository *MetricRepositoryImpl) GetAll(ctx context.Context) map[string]entity.MetricEntity {
 	log := logging.FromContext(ctx)
 	log.Debug().Msg("Получение всех метрик из хранилища")
-	return repository.Storage.Metrics
+
+	repository.Storage.Mu.RLock()
+	defer repository.Storage.Mu.RUnlock()
+
+	copyMap := make(map[string]entity.MetricEntity, len(repository.Storage.Metrics))
+	maps.Copy(copyMap, repository.Storage.Metrics)
+
+	return copyMap
 }
 
 func (repository *MetricRepositoryImpl) Clean(ctx context.Context) {
 	log := logging.FromContext(ctx)
 	log.Debug().Msg("Очищаем")
+	repository.Storage.Mu.Lock()
+	defer repository.Storage.Mu.Unlock()
 	repository.Storage.Metrics = make(map[string]entity.MetricEntity)
 }

@@ -48,9 +48,11 @@ func CompressMiddleware() gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
+		acceptEncoding := c.GetHeader("Accept-Encoding")
+		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 		contentType := resMulti.Header().Get("Content-Type")
 		resMulti.ContentType = contentType
-		if strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html") {
+		if supportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")) {
 			resMulti.Header().Set("Content-Encoding", "gzip")
 			resMulti.Header().Add("Vary", "Accept-Encoding")
 			compressBytes, err := CompressBytes(resMulti.BodyResponse)

@@ -1,4 +1,4 @@
-package dto
+package entity
 
 type MetricEntity struct {
 	ID    string

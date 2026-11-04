@@ -124,9 +124,21 @@ func (s *MetricServiceImpl) StartStoreTicker(ctx context.Context) {
 		go func() {
 			ticker := time.NewTicker(time.Duration(s.conf.StoreInterval) * time.Second)
 			defer ticker.Stop()
-			for range ticker.C {
-				if err := s.saveMetricsInFile(); err != nil {
-					log.Error().Err(err).Msg("Ошибка при периодическом сохранении метрик")
+
+			log.Info().Msg("Запущен тикер сохранения метрик в файл")
+
+			for {
+				select {
+				case <-ticker.C:
+					if err := s.saveMetricsInFile(); err != nil {
+						log.Error().Err(err).Msg("Ошибка при периодическом сохранении метрик")
+					}
+				case <-ctx.Done():
+					log.Info().Msg("Контекст отменен, останавливаем тикер сохранения метрик")
+					if err := s.saveMetricsInFile(); err != nil {
+						log.Error().Err(err).Msg("Ошибка при финальном сохранении метрик перед выходом")
+					}
+					return
 				}
 			}
 		}()
