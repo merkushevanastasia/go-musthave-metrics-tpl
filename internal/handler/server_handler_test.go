@@ -1,15 +1,19 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestHandleMetricUpdate(t *testing.T) {
@@ -69,12 +73,11 @@ func TestHandleMetricUpdate(t *testing.T) {
 	}
 
 	mockServiceImpl := &service.MockMetricService{}
+	router := gin.New()
+	router.POST("/update/:metric_type/:metric_name/:metric_value", HandleMetricUpdate(mockServiceImpl))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := gin.New()
-
-			router.POST("/update/:metric_type/:metric_name/:metric_value", HandleMetricUpdate(mockServiceImpl))
-
+			mockServiceImpl.On("UpdateMetric", mock.Anything, mock.Anything).Return().Once()
 			request := httptest.NewRequest(tt.input.Method, tt.input.URL, nil)
 
 			w := httptest.NewRecorder()
@@ -85,7 +88,116 @@ func TestHandleMetricUpdate(t *testing.T) {
 			defer func(Body io.ReadCloser) {
 				err := Body.Close()
 				if err != nil {
-					slog.Error("Body close error", slog.Any("err", err))
+					log.Logger.Error().Any("err", err).Msg("Body close error")
+				}
+			}(response.Body)
+
+			assert.Equal(t, tt.want.Code, response.StatusCode)
+
+			resBody, err := io.ReadAll(response.Body)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want.Response, string(resBody))
+		})
+	}
+}
+
+func floatPtr(v float64) *float64 {
+	return new(v)
+}
+func TestHandleMetricUpdateV2(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	type ExpectedData struct {
+		Code        int
+		Response    string
+		ContentType string
+	}
+	type InputData struct {
+		Request dto.MetricDto
+		Method  string
+	}
+
+	tests := []struct {
+		name  string
+		input InputData
+		want  ExpectedData
+	}{
+		{
+			name: "TestHandleMetricUpdateGaugeOk",
+			input: InputData{
+				Request: dto.MetricDto{
+					ID:    "NameMetric",
+					MType: "gauge",
+					Value: floatPtr(10.0),
+				},
+				Method: http.MethodPost,
+			},
+			want: ExpectedData{
+				Code:        200,
+				ContentType: "text/plain; charset=utf-8",
+				Response:    "",
+			},
+		},
+		{
+			name: "TestHandleMetricUpdateCounterOk",
+			input: InputData{
+				Request: dto.MetricDto{
+					ID:    "NameMetric",
+					MType: "counter",
+					Value: floatPtr(10.0),
+				},
+				Method: http.MethodPost,
+			},
+			want: ExpectedData{
+				Code:        200,
+				ContentType: "text/plain; charset=utf-8",
+				Response:    "",
+			},
+		},
+		{
+			name: "TestHandleMetricUpdateMetricNameError",
+			input: InputData{
+				Request: dto.MetricDto{
+					ID:    "",
+					MType: "counter",
+					Value: floatPtr(10.0),
+				},
+				Method: http.MethodPost,
+			},
+			want: ExpectedData{
+				Code:        404,
+				ContentType: "text/plain; charset=utf-8",
+				Response:    "в запросе отсутствует имя метрики",
+			},
+		},
+	}
+
+	mockServiceImpl := &service.MockMetricService{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			bodyBytes, err := json.Marshal(tt.input.Request)
+			if err != nil {
+				t.Fatalf("Не удалось замаршалить структуру в JSON: %v", err)
+			}
+
+			// 2. Передаем bytes.NewReader(bodyBytes) третьим параметром
+			request := httptest.NewRequest(tt.input.Method, "/update", bytes.NewReader(bodyBytes))
+
+			// 3. ОБЯЗАТЕЛЬНО задаем заголовок Content-Type, иначе Gin не поймет, что это JSON
+			request.Header.Set("Content-Type", "application/json")
+			router.POST("/update", HandleMetricUpdateV2(mockServiceImpl))
+			mockServiceImpl.On("UpdateMetric", mock.Anything, mock.Anything).Return().Once()
+
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, request)
+
+			response := w.Result()
+
+			defer func(Body io.ReadCloser) {
+				err := Body.Close()
+				if err != nil {
+					log.Logger.Error().Any("err", err).Msg("Body close error")
 				}
 			}(response.Body)
 

@@ -3,24 +3,25 @@ package repository
 import (
 	"context"
 	"fmt"
-	"log/slog"
+	"maps"
+	"sync"
 
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	customerrors "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils"
+	entity "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/entity"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
 )
 
-// MemStorage todo пока что оставлю раздельными, возможно на блоке по БД объединить Gauge и Counter в общую таблицу
 type MemStorage struct {
-	Gauge   map[string]float64
-	Counter map[string]int64
+	Mu      sync.RWMutex
+	Metrics map[string]entity.MetricEntity
 }
 
 type MetricRepository interface {
-	UpdateGauge(ctx context.Context, name string, value float64)
-	UpdateCounter(ctx context.Context, name string, value int64)
-	GetGauge(ctx context.Context, name string) (float64, error)
-	GetCounter(ctx context.Context, name string) (int64, error)
-	GetAll(ctx context.Context) (map[string]float64, map[string]int64)
+	Update(ctx context.Context, entity entity.MetricEntity)
+	Get(ctx context.Context, metricName string) (entity.MetricEntity, error)
+	GetAll(ctx context.Context) map[string]entity.MetricEntity
+	Clean(ctx context.Context)
 }
 
 type MetricRepositoryImpl struct {
@@ -30,61 +31,69 @@ type MetricRepositoryImpl struct {
 func NewMetricRepositoryImpl() *MetricRepositoryImpl {
 	return &MetricRepositoryImpl{
 		Storage: MemStorage{
-			Gauge:   make(map[string]float64),
-			Counter: make(map[string]int64),
+			Metrics: make(map[string]entity.MetricEntity),
 		},
 	}
 }
 
-func (repository MetricRepositoryImpl) UpdateGauge(ctx context.Context, metricName string, value float64) {
+func (repository *MetricRepositoryImpl) Update(ctx context.Context, metricEntity entity.MetricEntity) {
+	log := logs.GetLoggerFromContext(ctx)
 
-	log := utils.FromContext(ctx)
-	log.Debug("Хранилище метрик перед обновлением.", slog.Any("memStorage", repository.Storage))
-	repository.Storage.Gauge[metricName] = value
-	log.Debug("Хранилище метрик послк обновления.", slog.Any("memStorage", repository.Storage))
+	repository.Storage.Mu.Lock()
+	defer repository.Storage.Mu.Unlock()
 
-}
-func (repository MetricRepositoryImpl) UpdateCounter(ctx context.Context, metricName string, value int64) {
-	log := utils.FromContext(ctx)
-	log.Debug("Хранилище метрик перед обновлением.", slog.Any("memStorage", repository.Storage))
-	_, isPresent := repository.Storage.Counter[metricName]
+	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик перед обновлением")
 
-	if isPresent {
-		repository.Storage.Counter[metricName] += value
-	} else {
-		repository.Storage.Counter[metricName] = value
+	if metricEntity.MType == constants.CounterMetricType {
+		current, isPresent := repository.Storage.Metrics[metricEntity.ID]
+		if isPresent {
+			var newDelta int64 = 0
+			if current.Delta != nil {
+				newDelta = newDelta + *current.Delta
+			}
+			if metricEntity.Delta != nil {
+				newDelta = newDelta + *metricEntity.Delta
+			}
+			metricEntity.Delta = &newDelta
+		}
 	}
-	log.Debug("Хранилище метрик послк обновления.", slog.Any("memStorage", repository.Storage))
+	repository.Storage.Metrics[metricEntity.ID] = metricEntity
 
+	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик после обновления")
 }
 
-func (repository MetricRepositoryImpl) GetGauge(ctx context.Context, metricName string) (float64, error) {
-	log := utils.FromContext(ctx)
-	log.Debug("Запрос значения метрики из хранилища", slog.Any("имя метрики", metricName))
-	currentValue, isPresent := repository.Storage.Gauge[metricName]
-	if isPresent {
-		return currentValue, nil
-	}
+func (repository *MetricRepositoryImpl) Get(ctx context.Context, metricName string) (entity.MetricEntity, error) {
+	log := logs.GetLoggerFromContext(ctx)
+	log.Debug().Str("имя метрики", metricName).Msg("Запрос значения метрики из хранилища")
 
-	log.Debug(fmt.Sprintf("Такой метрики не существует %s", metricName))
-	return currentValue, customerrors.ErrMetricNotFound
-}
-
-func (repository MetricRepositoryImpl) GetCounter(ctx context.Context, metricName string) (int64, error) {
-	log := utils.FromContext(ctx)
-	log.Debug("Запрос значения метрики из хранилища", slog.Any("имя метрики", metricName))
-	currentValue, isPresent := repository.Storage.Counter[metricName]
-
+	repository.Storage.Mu.RLock()
+	defer repository.Storage.Mu.RUnlock()
+	currentValue, isPresent := repository.Storage.Metrics[metricName]
 	if isPresent {
 		return currentValue, nil
 	}
 
-	log.Debug(fmt.Sprintf("Такой метрики не существует %s", metricName))
+	log.Debug().Msg(fmt.Sprintf("Такой метрики не существует %s", metricName))
 	return currentValue, customerrors.ErrMetricNotFound
 }
 
-func (repository MetricRepositoryImpl) GetAll(ctx context.Context) (map[string]float64, map[string]int64) {
-	log := utils.FromContext(ctx)
-	log.Debug("Получение всех метрик из хранилища")
-	return repository.Storage.Gauge, repository.Storage.Counter
+func (repository *MetricRepositoryImpl) GetAll(ctx context.Context) map[string]entity.MetricEntity {
+	log := logs.GetLoggerFromContext(ctx)
+	log.Debug().Msg("Получение всех метрик из хранилища")
+
+	repository.Storage.Mu.RLock()
+	defer repository.Storage.Mu.RUnlock()
+
+	copyMap := make(map[string]entity.MetricEntity, len(repository.Storage.Metrics))
+	maps.Copy(copyMap, repository.Storage.Metrics)
+
+	return copyMap
+}
+
+func (repository *MetricRepositoryImpl) Clean(ctx context.Context) {
+	log := logs.GetLoggerFromContext(ctx)
+	log.Debug().Msg("Очищаем")
+	repository.Storage.Mu.Lock()
+	defer repository.Storage.Mu.Unlock()
+	repository.Storage.Metrics = make(map[string]entity.MetricEntity)
 }
