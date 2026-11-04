@@ -10,6 +10,7 @@ import (
 	customerrors "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
 	entity "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/entity"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils/logging"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
 )
 
 type MemStorage struct {
@@ -69,7 +70,7 @@ func (repository *MetricRepositoryImpl) Get(ctx context.Context, metricName stri
 	repository.Storage.Mu.RLock()
 	defer repository.Storage.Mu.RUnlock()
 	currentValue, isPresent := repository.Storage.Metrics[metricName]
-
+	logs.Test()
 	if isPresent {
 		return currentValue, nil
 	}
