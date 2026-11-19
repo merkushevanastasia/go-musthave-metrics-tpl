@@ -72,7 +72,7 @@ func run() {
 
 	deps := initDeps(mainCtx, conf)
 	if err := deps.MetricService.RestoreMetrics(); err != nil {
-		log.Printf("failed to restore: %v", err)
+		log.Printf("Не удалось загрузить данные: %v", err)
 	}
 	deps.MetricService.StartStoreTicker(mainCtx)
 
