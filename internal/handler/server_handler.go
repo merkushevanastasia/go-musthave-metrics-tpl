@@ -22,7 +22,6 @@ func SetUpRoutes(router *gin.Engine, metricService service.MetricService, dbPool
 	router.GET(pathGet, HandleMetricGetV1(metricService))
 	router.GET("/", HandleMetricGetAll(metricService))
 	router.POST("/value", HandleMetricGetV2(metricService))
-	router.POST("/value/", HandleMetricGetV2(metricService))
 	router.POST("/update", HandleMetricUpdateV2(metricService))
 	router.GET("/ping", HandleDBPing(dbPool))
 }
