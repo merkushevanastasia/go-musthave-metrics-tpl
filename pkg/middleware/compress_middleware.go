@@ -9,7 +9,7 @@ import (
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs/rest"
-	requestresponse2 "github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/middleware/requestresponse"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/middleware/requestresponse"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,7 +18,7 @@ func CompressMiddleware() gin.HandlerFunc {
 
 		logger := logs.GetLoggerFromGin(ctx)
 
-		reqMulti, ok := ctx.Request.Body.(*requestresponse2.RequestMultiple)
+		reqMulti, ok := ctx.Request.Body.(*requestresponse.RequestMultiple)
 		if !ok {
 			rest.LogError(logger, nil, "Не удалось преобразовать запрос в requestresponse.ResponseMultiple")
 			ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -26,7 +26,9 @@ func CompressMiddleware() gin.HandlerFunc {
 		}
 
 		// Если данные были сжаты, то приводим их к изначальному виду
-		if ctx.GetHeader("Content-Encoding") == "gzip" {
+		isNeedCompress := ctx.GetHeader("Content-Encoding") == "gzip"
+		if isNeedCompress {
+
 			reader, err := gzip.NewReader(bytes.NewReader(*reqMulti.RequestBody))
 			if err != nil {
 				ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -42,14 +44,14 @@ func CompressMiddleware() gin.HandlerFunc {
 
 		ctx.Next()
 
-		resMulti, ok := ctx.Writer.(*requestresponse2.ResponseMultiple)
+		resMulti, ok := ctx.Writer.(*requestresponse.ResponseMultiple)
 		if !ok {
 			ctx.AbortWithStatus(http.StatusInternalServerError)
 			rest.LogError(logger, nil, "Не удалось преобразовать ответ в requestresponse.ResponseMultiple")
 			return
 		}
 
-		if isNeedResultCompress(resMulti) {
+		if isNeedResultCompress(isNeedCompress, resMulti) {
 			resMulti.Header().Set("Content-Encoding", "gzip")
 			resMulti.Header().Add("Vary", "Accept-Encoding")
 			compressBytes, err := compressBytes(resMulti.BodyResponse)
@@ -67,11 +69,9 @@ func CompressMiddleware() gin.HandlerFunc {
 }
 
 // Нужно ли сжимать ответ
-func isNeedResultCompress(resMulti *requestresponse2.ResponseMultiple) bool {
-	acceptEncoding := resMulti.Header().Get("Accept-Encoding")
-	supportsGzip := strings.Contains(acceptEncoding, "gzip")
+func isNeedResultCompress(isNeedCompress bool, resMulti *requestresponse.ResponseMultiple) bool {
 	contentType := resMulti.Header().Get("Content-Type")
-	return supportsGzip && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html"))
+	return isNeedCompress && (strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html"))
 }
 
 // Сжимаем данные
