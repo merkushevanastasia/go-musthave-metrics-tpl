@@ -20,6 +20,7 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/middleware"
 	"github.com/caarlos0/env/v11"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
 
@@ -33,6 +34,7 @@ func main() {
 type Deps struct {
 	MetricRepository repository.MetricRepository
 	MetricService    service.MetricService
+	DbPool           *pgxpool.Pool
 }
 
 func run() {
@@ -43,6 +45,7 @@ func run() {
 	flag.IntVar(&conf.StoreInterval, "i", 10, "store interval in seconds")
 	flag.StringVar(&conf.FileStoragePath, "f", "/tmp/metrics.json", "file storage path")
 	flag.BoolVar(&conf.Restore, "r", false, "restore previous values from file")
+	flag.StringVar(&conf.DatabaseDSN, "d", "postgres://postgres_app_user:postgres_user_password@localhost:5432/postgres_app_db?sslmode=disable", "database connection string")
 	flag.Parse()
 	if err := env.Parse(&conf); err != nil {
 		log.Printf("failed to parse env variables: %v", err)
@@ -67,13 +70,13 @@ func run() {
 	mainCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	deps := initDeps(conf)
+	deps := initDeps(mainCtx, conf)
 	if err := deps.MetricService.RestoreMetrics(); err != nil {
 		log.Printf("failed to restore: %v", err)
 	}
 	deps.MetricService.StartStoreTicker(mainCtx)
 
-	handler.SetUpRoutes(router, deps.MetricService)
+	handler.SetUpRoutes(router, deps.MetricService, deps.DbPool)
 
 	log.Info().Msg("Инициализация http-server-а выполнена успешно")
 
@@ -101,11 +104,21 @@ func run() {
 	}
 }
 
-func initDeps(config server.Config) Deps {
+func initDeps(ctx context.Context, config server.Config) Deps {
+	var dbPool *pgxpool.Pool
+	if config.DatabaseDSN != "" {
+		var err error
+		dbPool, err = pgxpool.New(ctx, config.DatabaseDSN)
+		if err != nil {
+			log.Error().Err(err).Msg("Ошибка при создании пула подключений к PostgreSQL")
+		}
+	}
+
 	repoImpl := repository.NewMetricRepositoryImpl()
 	serviceImpl := service.NewMetricServiceImpl(repoImpl, config)
 	return Deps{
 		MetricRepository: repoImpl,
 		MetricService:    serviceImpl,
+		DbPool:           dbPool,
 	}
 }

@@ -10,9 +10,10 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func SetUpRoutes(router *gin.Engine, metricService service.MetricService) {
+func SetUpRoutes(router *gin.Engine, metricService service.MetricService, dbPool *pgxpool.Pool) {
 
 	pathUpdate := fmt.Sprintf("/update/:%s/:%s/:%s", constants.MetricTypePathKey, constants.MetricNamePathKey, constants.MetricValuePathKey)
 	pathGet := fmt.Sprintf("/value/:%s/:%s", constants.MetricTypePathKey, constants.MetricNamePathKey)
@@ -23,6 +24,7 @@ func SetUpRoutes(router *gin.Engine, metricService service.MetricService) {
 	router.POST("/value", HandleMetricGetV2(metricService))
 	router.POST("/value/", HandleMetricGetV2(metricService))
 	router.POST("/update", HandleMetricUpdateV2(metricService))
+	router.GET("/ping", HandleDbPing(dbPool))
 }
 
 // handleError маппинг кастомной ошибки в ожидаемый ответ
