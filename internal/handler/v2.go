@@ -68,7 +68,7 @@ func HandleMetricUpdateV2(metricService service.MetricService) gin.HandlerFunc {
 		c.Status(http.StatusOK)
 	}
 }
-func HandleDbPing(dbPool *pgxpool.Pool) gin.HandlerFunc {
+func HandleDBPing(dbPool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := logs.GetLoggerFromContext(c.Request.Context())
 

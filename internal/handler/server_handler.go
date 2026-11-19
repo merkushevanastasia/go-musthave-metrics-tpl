@@ -24,7 +24,7 @@ func SetUpRoutes(router *gin.Engine, metricService service.MetricService, dbPool
 	router.POST("/value", HandleMetricGetV2(metricService))
 	router.POST("/value/", HandleMetricGetV2(metricService))
 	router.POST("/update", HandleMetricUpdateV2(metricService))
-	router.GET("/ping", HandleDbPing(dbPool))
+	router.GET("/ping", HandleDBPing(dbPool))
 }
 
 // handleError маппинг кастомной ошибки в ожидаемый ответ

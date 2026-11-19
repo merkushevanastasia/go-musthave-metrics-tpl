@@ -34,7 +34,7 @@ func main() {
 type Deps struct {
 	MetricRepository repository.MetricRepository
 	MetricService    service.MetricService
-	DbPool           *pgxpool.Pool
+	DBPool           *pgxpool.Pool
 }
 
 func run() {
@@ -76,7 +76,7 @@ func run() {
 	}
 	deps.MetricService.StartStoreTicker(mainCtx)
 
-	handler.SetUpRoutes(router, deps.MetricService, deps.DbPool)
+	handler.SetUpRoutes(router, deps.MetricService, deps.DBPool)
 
 	log.Info().Msg("Инициализация http-server-а выполнена успешно")
 
@@ -119,6 +119,6 @@ func initDeps(ctx context.Context, config server.Config) Deps {
 	return Deps{
 		MetricRepository: repoImpl,
 		MetricService:    serviceImpl,
-		DbPool:           dbPool,
+		DBPool:           dbPool,
 	}
 }
