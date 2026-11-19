@@ -33,3 +33,7 @@ const TotalAlloc = "TotalAlloc"
 
 const PollCount = "PollCount"
 const RandomValue = "RandomValue"
+
+const MetricNamePathKey = "metric_name"
+const MetricValuePathKey = "metric_value"
+const MetricTypePathKey = "metric_type"
