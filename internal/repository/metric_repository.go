@@ -65,6 +65,7 @@ func (repository *MetricRepositoryImpl) Update(ctx context.Context, metricEntity
 func (repository *MetricRepositoryImpl) Get(ctx context.Context, metricName string) (entity.MetricEntity, error) {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Debug().Str("имя метрики", metricName).Msg("Запрос значения метрики из хранилища")
+	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик ")
 
 	repository.Storage.Mu.RLock()
 	defer repository.Storage.Mu.RUnlock()
