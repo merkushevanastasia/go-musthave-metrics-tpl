@@ -1,4 +1,4 @@
-package logging
+package logs
 
 import (
 	"context"
@@ -12,30 +12,6 @@ import (
 type LoggerConfig struct {
 	Level string
 }
-type (
-	// ResponseData создаём структуру для хранения сведений об ответе
-	ResponseData struct {
-		Status int
-		Size   int
-	}
-
-	// LoggingResponseWriter добавляем реализацию gin.ResponseWriter
-	LoggingResponseWriter struct {
-		gin.ResponseWriter
-		ResponseData *ResponseData
-	}
-)
-
-func (r *LoggingResponseWriter) Write(b []byte) (int, error) {
-	size, err := r.ResponseWriter.Write(b)
-	r.ResponseData.Size += size
-	return size, err
-}
-
-func (r *LoggingResponseWriter) WriteHeader(statusCode int) {
-	r.ResponseWriter.WriteHeader(statusCode)
-	r.ResponseData.Status = statusCode
-}
 
 // InitBaseLogger Инициализируем и настраиваем базовый логер
 func InitBaseLogger(config LoggerConfig) {
@@ -43,8 +19,8 @@ func InitBaseLogger(config LoggerConfig) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	logLevel := parseLogLevel(config.Level)
 	zerolog.SetGlobalLevel(logLevel)
-	baseLogger := zerolog.New(os.Stdout).With().Timestamp().Caller().Logger()
-	log.Logger = baseLogger
+	logger := zerolog.New(os.Stdout).With().Timestamp().Caller().Logger()
+	log.Logger = logger
 	log.Info().Msg("Базовый логгер успешно проинициализирован")
 }
 
@@ -64,6 +40,10 @@ func parseLogLevel(level string) zerolog.Level {
 	}
 }
 
-func FromContext(ctx context.Context) *zerolog.Logger {
+func GetLoggerFromContext(ctx context.Context) *zerolog.Logger {
 	return zerolog.Ctx(ctx)
+}
+
+func GetLoggerFromGin(ctx *gin.Context) *zerolog.Logger {
+	return zerolog.Ctx(ctx.Request.Context())
 }
