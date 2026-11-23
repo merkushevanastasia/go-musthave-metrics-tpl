@@ -39,3 +39,12 @@ func (m *MockMetricRepository) GetAll(ctx context.Context) map[string]entity.Met
 func (m *MockMetricRepository) Clean(ctx context.Context) {
 	m.Called(ctx)
 }
+func (m *MockMetricRepository) RestoreMetrics(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockMetricRepository) CreateDump(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
