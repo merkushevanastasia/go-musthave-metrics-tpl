@@ -17,11 +17,11 @@ var fs embed.FS
 
 func RunMigrations(pool *pgxpool.Pool) error {
 	sourceDriver, err := iofs.New(fs, ".")
-	defer sourceDriver.Close()
 
 	if err != nil {
 		return fmt.Errorf("failed to create iofs source: %w", err)
 	}
+	defer sourceDriver.Close()
 
 	db := stdlib.OpenDBFromPool(pool)
 	defer db.Close()
