@@ -81,10 +81,12 @@ func (s *MetricServiceImpl) StartStoreTicker(ctx context.Context) {
 					log.Error().Err(err).Msg("Ошибка при периодическом сохранении метрик")
 				}
 			case <-ctx.Done():
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				log.Info().Msg("Контекст отменен, останавливаем тикер сохранения метрик")
-				if err := s.repo.CreateDump(ctx); err != nil {
+				if err := s.repo.CreateDump(shutdownCtx); err != nil {
 					log.Error().Err(err).Msg("Ошибка при финальном сохранении метрик перед выходом")
 				}
+				cancel()
 				return
 			}
 		}
