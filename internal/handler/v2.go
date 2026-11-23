@@ -3,11 +3,9 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
 
-	servererror "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
@@ -28,16 +26,8 @@ func HandleMetricGetV2(metricService service.MetricService) gin.HandlerFunc {
 		log.Info().Msg("Поступил запрос на получение метрики...")
 
 		metric, err := metricService.GetMetric(c.Request.Context(), metricRequest.ID)
-		if err != nil {
-			log.Info().Err(err).Msg("ЭТО ОШИБКА")
-		}
 
-		if err != nil && errors.Is(err, servererror.ErrNotValidMetricName) {
-			c.Status(http.StatusOK)
-			return
-		}
-		if err != nil && !errors.Is(err, servererror.ErrMetricNotFound) {
-			log.Info().Err(err).Msg("Я тут!")
+		if err != nil {
 			handleError(c, err)
 			return
 		}
