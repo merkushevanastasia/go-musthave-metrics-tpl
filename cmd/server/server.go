@@ -115,7 +115,7 @@ func initDeps(ctx context.Context, config server.Config) Deps {
 		if err != nil {
 			log.Fatal().Err(err).Msg("Ошибка подключения к PostgreSQL")
 		}
-		repoImpl = repository.NewMetricDbRepositoryImpl(dbPool)
+		repoImpl = repository.NewMetricDBRepositoryImpl(dbPool)
 		log.Info().Msg("Используется хранилище PostgreSQL")
 	} else if config.FileStoragePath != "" {
 		repoImpl = repository.NewMetricFSRepositoryImpl(config)

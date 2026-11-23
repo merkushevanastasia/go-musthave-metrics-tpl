@@ -12,21 +12,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type MetricDbRepositoryImpl struct {
+type MetricDBRepositoryImpl struct {
 	Storage MemStorage
-	Db      *pgxpool.Pool
+	DB      *pgxpool.Pool
 }
 
-func NewMetricDbRepositoryImpl(dbPool *pgxpool.Pool) *MetricDbRepositoryImpl {
-	return &MetricDbRepositoryImpl{
-		Db: dbPool,
+func NewMetricDBRepositoryImpl(dbPool *pgxpool.Pool) *MetricDBRepositoryImpl {
+	return &MetricDBRepositoryImpl{
+		DB: dbPool,
 		Storage: MemStorage{
 			Metrics: make(map[string]entity.MetricEntity),
 		},
 	}
 }
 
-func (repository *MetricDbRepositoryImpl) Update(ctx context.Context, metricEntity entity.MetricEntity) {
+func (repository *MetricDBRepositoryImpl) Update(ctx context.Context, metricEntity entity.MetricEntity) {
 	log := logs.GetLoggerFromContext(ctx)
 
 	repository.Storage.Mu.Lock()
@@ -52,7 +52,7 @@ func (repository *MetricDbRepositoryImpl) Update(ctx context.Context, metricEnti
 	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик после обновления")
 }
 
-func (repository *MetricDbRepositoryImpl) Get(ctx context.Context, metricName string) (entity.MetricEntity, error) {
+func (repository *MetricDBRepositoryImpl) Get(ctx context.Context, metricName string) (entity.MetricEntity, error) {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Debug().Str("имя метрики", metricName).Msg("Запрос значения метрики из хранилища")
 	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик ")
@@ -68,7 +68,7 @@ func (repository *MetricDbRepositoryImpl) Get(ctx context.Context, metricName st
 	return currentValue, customerrors.ErrMetricNotFound
 }
 
-func (repository *MetricDbRepositoryImpl) GetAll(ctx context.Context) map[string]entity.MetricEntity {
+func (repository *MetricDBRepositoryImpl) GetAll(ctx context.Context) map[string]entity.MetricEntity {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Debug().Msg("Получение всех метрик из хранилища")
 
@@ -81,7 +81,7 @@ func (repository *MetricDbRepositoryImpl) GetAll(ctx context.Context) map[string
 	return copyMap
 }
 
-func (repository *MetricDbRepositoryImpl) Clean(ctx context.Context) {
+func (repository *MetricDBRepositoryImpl) Clean(ctx context.Context) {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Debug().Msg("Очищаем")
 	repository.Storage.Mu.Lock()
@@ -89,13 +89,13 @@ func (repository *MetricDbRepositoryImpl) Clean(ctx context.Context) {
 	repository.Storage.Metrics = make(map[string]entity.MetricEntity)
 }
 
-func (repository *MetricDbRepositoryImpl) RestoreMetrics(ctx context.Context) error {
+func (repository *MetricDBRepositoryImpl) RestoreMetrics(ctx context.Context) error {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Info().Msg("Для данного репозитория метод RestoreMetrics пока не реализован")
 	return nil
 }
 
-func (repository *MetricDbRepositoryImpl) CreateDump(ctx context.Context) error {
+func (repository *MetricDBRepositoryImpl) CreateDump(ctx context.Context) error {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Info().Msg("Для данного репозитория метод CreateDump не реализован")
 	return nil
