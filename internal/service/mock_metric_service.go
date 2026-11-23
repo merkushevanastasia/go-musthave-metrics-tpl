@@ -39,7 +39,7 @@ func (m *MockMetricService) StartStoreTicker(ctx context.Context) {
 }
 
 // RestoreMetrics имитирует восстановление метрик при старте
-func (m *MockMetricService) RestoreMetrics() error {
-	args := m.Called()
+func (m *MockMetricService) RestoreMetrics(ctx context.Context) error {
+	args := m.Called(ctx)
 	return args.Error(0)
 }
