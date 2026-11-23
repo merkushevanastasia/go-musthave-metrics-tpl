@@ -32,9 +32,13 @@ func HandleMetricGetV2(metricService service.MetricService) gin.HandlerFunc {
 			log.Info().Err(err).Msg("ЭТО ОШИБКА")
 		}
 
+		if err != nil && errors.Is(err, servererror.ErrNotValidMetricName) {
+			c.Status(http.StatusOK)
+			return
+		}
 		if err != nil && !errors.Is(err, servererror.ErrMetricNotFound) {
 			log.Info().Err(err).Msg("Я тут!")
-			handleErrorV2(c, err)
+			handleError(c, err)
 			return
 		}
 

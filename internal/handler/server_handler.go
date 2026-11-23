@@ -7,7 +7,6 @@ import (
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	servererror "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
 	"github.com/gin-gonic/gin"
@@ -57,35 +56,4 @@ func handleError(c *gin.Context, err error) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
-}
-func handleErrorV2(c *gin.Context, err error) {
-	logger := logs.GetLoggerFromContext(c.Request.Context())
-
-	if err != nil {
-		logger.Error().Msg(err.Error())
-
-		if errors.Is(err, servererror.ErrNotValidMetricName) {
-			c.String(http.StatusNotFound, err.Error())
-			return
-		}
-
-		if errors.Is(err, servererror.ErrMetricNotFound) {
-			c.JSON(http.StatusOK, dto.MetricDto{})
-			return
-		}
-
-		if errors.Is(err, servererror.ErrNotAllowedMetricType) {
-			c.String(http.StatusBadRequest, err.Error())
-			return
-		}
-
-		if errors.Is(err, servererror.ErrNotValidMetricValue) {
-			c.String(http.StatusBadRequest, err.Error())
-			return
-		}
-
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
 }
