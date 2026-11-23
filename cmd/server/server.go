@@ -45,7 +45,7 @@ func run() {
 	flag.IntVar(&conf.StoreInterval, "i", 10, "store interval in seconds")
 	flag.StringVar(&conf.FileStoragePath, "f", "/tmp/metrics.json", "file storage path")
 	flag.BoolVar(&conf.Restore, "r", false, "restore previous values from file")
-	flag.StringVar(&conf.DatabaseDSN, "d", "postgres://postgres_app_user:postgres_user_password@localhost:5432/postgres_app_db?sslmode=disable", "database connection string")
+	flag.StringVar(&conf.DatabaseDSN, "d", "", "database connection string")
 	flag.Parse()
 	if err := env.Parse(&conf); err != nil {
 		log.Printf("failed to parse env variables: %v", err)
@@ -71,11 +71,14 @@ func run() {
 	defer stop()
 
 	deps := initDeps(mainCtx, conf)
-	if err := deps.MetricService.RestoreMetrics(); err != nil {
+
+	if err := deps.MetricService.RestoreMetrics(mainCtx); err != nil {
 		log.Printf("Не удалось загрузить данные: %v", err)
 	}
-	deps.MetricService.StartStoreTicker(mainCtx)
 
+	if conf.StoreInterval > 0 && conf.FileStoragePath != "" {
+		deps.MetricService.StartStoreTicker(mainCtx)
+	}
 	handler.SetUpRoutes(router, deps.MetricService, deps.DBPool)
 
 	log.Info().Msg("Инициализация http-server-а выполнена успешно")
@@ -105,6 +108,22 @@ func run() {
 }
 
 func initDeps(ctx context.Context, config server.Config) Deps {
+	var repoImpl repository.MetricRepository
+	if config.DatabaseDSN != "" {
+		var err error
+		dbPool, err := pgxpool.New(ctx, config.DatabaseDSN)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Ошибка подключения к PostgreSQL")
+		}
+		repoImpl = repository.NewMetricDbRepositoryImpl(dbPool)
+		log.Info().Msg("Используется хранилище PostgreSQL")
+	} else if config.FileStoragePath != "" {
+		repoImpl = repository.NewMetricFSRepositoryImpl(config)
+		log.Info().Msg("Используется файловое хранилище")
+	} else {
+		repoImpl = repository.NewMetricMemoryRepositoryImpl()
+		log.Info().Msg("Используется хранилище в памяти")
+	}
 	var dbPool *pgxpool.Pool
 	if config.DatabaseDSN != "" {
 		var err error
@@ -114,7 +133,6 @@ func initDeps(ctx context.Context, config server.Config) Deps {
 		}
 	}
 
-	repoImpl := repository.NewMetricRepositoryImpl()
 	serviceImpl := service.NewMetricServiceImpl(repoImpl, config)
 	return Deps{
 		MetricRepository: repoImpl,
