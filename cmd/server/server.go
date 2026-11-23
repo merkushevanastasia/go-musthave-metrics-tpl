@@ -15,6 +15,7 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/static"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/migrations"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs/lifecyrcle"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/middleware"
@@ -123,6 +124,9 @@ func initDeps(ctx context.Context, config server.Config) Deps {
 		dbPool, err := pgxpool.New(ctx, config.DatabaseDSN)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Ошибка подключения к PostgreSQL")
+		}
+		if err := migrations.RunMigrations(dbPool); err != nil {
+			log.Fatal().Err(err).Msg("Ошибка применения миграций PostgreSQL")
 		}
 		repoImpl = repository.NewMetricDBRepositoryImpl(dbPool)
 		log.Info().Msg("Используется хранилище PostgreSQL")
