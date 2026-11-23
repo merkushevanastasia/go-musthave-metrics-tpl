@@ -23,7 +23,6 @@ func RunMigrations(pool *pgxpool.Pool) error {
 		return fmt.Errorf("failed to create iofs source: %w", err)
 	}
 
-	// Получаем стандартный *sql.DB из существующего pgxpool.Pool
 	db := stdlib.OpenDBFromPool(pool)
 	defer db.Close()
 
