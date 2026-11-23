@@ -3,9 +3,11 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
+	"path/filepath"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
@@ -93,37 +95,38 @@ func (repository *MetricFSRepositoryImpl) Clean(ctx context.Context) {
 
 func (repository *MetricFSRepositoryImpl) RestoreMetrics(ctx context.Context) error {
 	log := logs.GetLoggerFromContext(ctx)
-	if !repository.Config.Restore {
+	if !repository.Config.Restore || repository.Config.FileStoragePath == "" {
 		return nil
 	}
-	log.Info().Msg("Начинаем восстановление из файла" + repository.Config.FileStoragePath)
+	log.Info().Msg("Начинаем восстановление из файла: " + repository.Config.FileStoragePath)
 
 	data, err := os.ReadFile(repository.Config.FileStoragePath)
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		log.Info().Msg("Файл хранения метрик отсутствует, загрузка пропущена")
-		return err
-
+		return nil
 	}
 	if err != nil {
 		return err
-
+	}
+	if len(data) == 0 {
+		log.Info().Msg("Файл хранения метрик пуст, загрузка пропущена")
+		return nil
 	}
 
 	var items []entity.MetricEntity
 	if err := json.Unmarshal(data, &items); err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("Ошибка десериализации метрик из файла")
 		return err
 	}
 
 	log.Debug().Any("Содержимое файла", items).Msg("Содержимое")
 
-	repository.Clean(context.Background())
+	repository.Clean(ctx)
 	for _, item := range items {
-		repository.Update(context.Background(), item)
+		repository.Update(ctx, item)
 	}
 	return nil
 }
-
 func (repository *MetricFSRepositoryImpl) CreateDump(ctx context.Context) error {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Info().Msg("Создаём дамп")
@@ -131,9 +134,9 @@ func (repository *MetricFSRepositoryImpl) CreateDump(ctx context.Context) error 
 		return nil
 	}
 
-	metricsMap := repository.GetAll(context.Background())
+	metricsMap := repository.GetAll(ctx)
 
-	var items []entity.MetricEntity
+	items := make([]entity.MetricEntity, 0, len(metricsMap))
 	for _, metric := range metricsMap {
 		items = append(items, metric)
 	}
@@ -142,12 +145,23 @@ func (repository *MetricFSRepositoryImpl) CreateDump(ctx context.Context) error 
 	if err != nil {
 		return err
 	}
-	file, err := os.OpenFile(repository.Config.FileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+
+	dir := filepath.Dir(repository.Config.FileStoragePath)
+	tmpFile, err := os.CreateTemp(dir, "metrics-*.tmp")
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	tmpName := tmpFile.Name()
 
-	_, err = file.Write(data)
-	return err
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpName)
+		return err
+	}
+	if err := tmpFile.Close(); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+
+	return os.Rename(tmpName, repository.Config.FileStoragePath)
 }

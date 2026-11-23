@@ -19,6 +19,7 @@ func InitBaseLogger(config LoggerConfig) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	logLevel := parseLogLevel(config.Level)
 	zerolog.SetGlobalLevel(logLevel)
+	zerolog.DefaultContextLogger = &log.Logger
 	logger := zerolog.New(os.Stdout).With().Timestamp().Caller().Logger()
 	log.Logger = logger
 	log.Info().Msg("Базовый логгер успешно проинициализирован")

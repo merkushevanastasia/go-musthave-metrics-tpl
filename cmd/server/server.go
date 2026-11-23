@@ -44,7 +44,7 @@ func run() {
 	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
 	flag.IntVar(&conf.StoreInterval, "i", 10, "store interval in seconds")
 	flag.StringVar(&conf.FileStoragePath, "f", "/tmp/metrics.json", "file storage path")
-	flag.BoolVar(&conf.Restore, "r", false, "restore previous values from file")
+	flag.BoolVar(&conf.Restore, "r", true, "restore previous values from file")
 	flag.StringVar(&conf.DatabaseDSN, "d", "", "database connection string")
 	flag.Parse()
 	if err := env.Parse(&conf); err != nil {
@@ -68,6 +68,7 @@ func run() {
 	router.SetHTMLTemplate(fs)
 
 	mainCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+
 	defer stop()
 
 	deps := initDeps(mainCtx, conf)
@@ -102,8 +103,16 @@ func run() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// 1. Сначала останавливаем HTTP-сервер, чтобы дождаться завершения всех текущих запросов /update
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Error().Err(err).Msg("Ошибка при принудительной остановке HTTP-сервера")
+	}
+
+	// 2. Синхронно сохраняем метрики в файл перед выходом из main()
+	if conf.FileStoragePath != "" {
+		if err := deps.MetricRepository.CreateDump(shutdownCtx); err != nil {
+			log.Error().Err(err).Msg("Ошибка при финальном сохранении метрик перед выходом")
+		}
 	}
 }
 
