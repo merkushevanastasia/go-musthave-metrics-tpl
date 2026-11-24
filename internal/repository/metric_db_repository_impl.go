@@ -2,101 +2,126 @@ package repository
 
 import (
 	"context"
-	"fmt"
-	"maps"
+	"errors"
 
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	customerrors "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
 	entity "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/entity"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type MetricDBRepositoryImpl struct {
-	Storage MemStorage
-	DB      *pgxpool.Pool
+	DB *pgxpool.Pool
 }
 
 func NewMetricDBRepositoryImpl(dbPool *pgxpool.Pool) *MetricDBRepositoryImpl {
 	return &MetricDBRepositoryImpl{
 		DB: dbPool,
-		Storage: MemStorage{
-			Metrics: make(map[string]entity.MetricEntity),
-		},
 	}
 }
 
 func (repository *MetricDBRepositoryImpl) Update(ctx context.Context, metricEntity entity.MetricEntity) {
 	log := logs.GetLoggerFromContext(ctx)
 
-	repository.Storage.Mu.Lock()
-	defer repository.Storage.Mu.Unlock()
+	query := `
+		INSERT INTO metrics (id, mtype, delta, value)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (id, mtype) DO UPDATE SET
+			delta = COALESCE(metrics.delta, 0) + COALESCE(EXCLUDED.delta, 0),
+			value = EXCLUDED.value;
+	`
 
-	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик перед обновлением")
-
-	if metricEntity.MType == constants.CounterMetricType {
-		current, isPresent := repository.Storage.Metrics[metricEntity.ID]
-		if isPresent {
-			var newDelta int64 = 0
-			if current.Delta != nil {
-				newDelta = newDelta + *current.Delta
-			}
-			if metricEntity.Delta != nil {
-				newDelta = newDelta + *metricEntity.Delta
-			}
-			metricEntity.Delta = &newDelta
-		}
+	_, err := repository.DB.Exec(
+		ctx,
+		query,
+		metricEntity.ID,
+		metricEntity.MType,
+		metricEntity.Delta,
+		metricEntity.Value,
+	)
+	if err != nil {
+		log.Error().Err(err).Str("id", metricEntity.ID).Msg("Ошибка при сохранении метрики в PostgreSQL")
 	}
-	repository.Storage.Metrics[metricEntity.ID] = metricEntity
-
-	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик после обновления")
 }
 
 func (repository *MetricDBRepositoryImpl) Get(ctx context.Context, metricName string) (entity.MetricEntity, error) {
 	log := logs.GetLoggerFromContext(ctx)
-	log.Debug().Str("имя метрики", metricName).Msg("Запрос значения метрики из хранилища")
-	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик ")
+	log.Debug().Str("имя метрики", metricName).Msg("Запрос значения метрики из PostgreSQL")
 
-	repository.Storage.Mu.RLock()
-	defer repository.Storage.Mu.RUnlock()
-	currentValue, isPresent := repository.Storage.Metrics[metricName]
-	if isPresent {
-		return currentValue, nil
+	query := `
+		SELECT id, mtype, delta, value
+		FROM metrics
+		WHERE id = $1
+		LIMIT 1;
+	`
+
+	var result entity.MetricEntity
+	err := repository.DB.QueryRow(ctx, query, metricName).Scan(
+		&result.ID,
+		&result.MType,
+		&result.Delta,
+		&result.Value,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			log.Debug().Str("id", metricName).Msg("Такой метрики не существует в PostgreSQL")
+			return entity.MetricEntity{}, customerrors.ErrMetricNotFound
+		}
+		log.Error().Err(err).Str("id", metricName).Msg("Ошибка при чтении метрики из PostgreSQL")
+		return entity.MetricEntity{}, err
 	}
 
-	log.Debug().Msg(fmt.Sprintf("Такой метрики не существует %s", metricName))
-	return currentValue, customerrors.ErrMetricNotFound
+	return result, nil
 }
 
 func (repository *MetricDBRepositoryImpl) GetAll(ctx context.Context) map[string]entity.MetricEntity {
 	log := logs.GetLoggerFromContext(ctx)
-	log.Debug().Msg("Получение всех метрик из хранилища")
+	log.Debug().Msg("Получение всех метрик из PostgreSQL")
 
-	repository.Storage.Mu.RLock()
-	defer repository.Storage.Mu.RUnlock()
+	query := `SELECT id, mtype, delta, value FROM metrics;`
 
-	copyMap := make(map[string]entity.MetricEntity, len(repository.Storage.Metrics))
-	maps.Copy(copyMap, repository.Storage.Metrics)
+	rows, err := repository.DB.Query(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Msg("Ошибка при получении всех метрик из PostgreSQL")
+		return make(map[string]entity.MetricEntity)
+	}
+	defer rows.Close()
 
-	return copyMap
+	result := make(map[string]entity.MetricEntity)
+	for rows.Next() {
+		var m entity.MetricEntity
+		if err := rows.Scan(&m.ID, &m.MType, &m.Delta, &m.Value); err != nil {
+			log.Error().Err(err).Msg("Ошибка при сканировании строки метрики из PostgreSQL")
+			continue
+		}
+		result[m.ID] = m
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Error().Err(err).Msg("Ошибка при итерации по строкам PostgreSQL")
+	}
+
+	return result
 }
 
 func (repository *MetricDBRepositoryImpl) Clean(ctx context.Context) {
 	log := logs.GetLoggerFromContext(ctx)
-	log.Debug().Msg("Очищаем")
-	repository.Storage.Mu.Lock()
-	defer repository.Storage.Mu.Unlock()
-	repository.Storage.Metrics = make(map[string]entity.MetricEntity)
+	log.Debug().Msg("Очищаем таблицу метрик в PostgreSQL")
+
+	if _, err := repository.DB.Exec(ctx, `TRUNCATE TABLE metrics;`); err != nil {
+		log.Error().Err(err).Msg("Ошибка при очистке таблицы metrics")
+	}
 }
 
 func (repository *MetricDBRepositoryImpl) RestoreMetrics(ctx context.Context) error {
 	log := logs.GetLoggerFromContext(ctx)
-	log.Info().Msg("Для данного репозитория метод RestoreMetrics пока не реализован")
+	log.Info().Msg("Для PostgreSQL метод RestoreMetrics не требуется")
 	return nil
 }
 
 func (repository *MetricDBRepositoryImpl) CreateDump(ctx context.Context) error {
 	log := logs.GetLoggerFromContext(ctx)
-	log.Info().Msg("Для данного репозитория метод CreateDump не реализован")
+	log.Info().Msg("Для PostgreSQL метод CreateDump не требуется")
 	return nil
 }
