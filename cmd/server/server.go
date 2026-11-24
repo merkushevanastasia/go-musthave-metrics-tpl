@@ -46,7 +46,7 @@ func run() {
 	flag.IntVar(&conf.StoreInterval, "i", 10, "store interval in seconds")
 	flag.StringVar(&conf.FileStoragePath, "f", "", "file storage path")
 	flag.BoolVar(&conf.Restore, "r", false, "restore previous values from file")
-	flag.StringVar(&conf.DatabaseDSN, "d", "postgres://postgres_app_user:postgres_user_password@localhost:5432/postgres_app_db?sslmode=disable", "database connection string")
+	flag.StringVar(&conf.DatabaseDSN, "d", "", "database connection string")
 	flag.Parse()
 	if err := env.Parse(&conf); err != nil {
 		log.Printf("failed to parse env variables: %v", err)
