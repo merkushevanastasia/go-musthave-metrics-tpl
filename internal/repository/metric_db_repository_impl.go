@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	customerrors "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
-	entity "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/entity"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/entity"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,10 +25,13 @@ func (repository *MetricDBRepositoryImpl) Update(ctx context.Context, metricEnti
 	log := logs.GetLoggerFromContext(ctx)
 
 	query := `
-		INSERT INTO metrics (id, mtype, delta, value)
+		INSERT INTO metrics (name, mtype, delta, value)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (id, mtype) DO UPDATE SET
-			delta = COALESCE(metrics.delta, 0) + COALESCE(EXCLUDED.delta, 0),
+		ON CONFLICT (name, mtype) DO UPDATE SET
+			delta = CASE
+				WHEN EXCLUDED.mtype = 'counter' THEN COALESCE(metrics.delta, 0) + COALESCE(EXCLUDED.delta, 0)
+				ELSE NULL
+			END,
 			value = EXCLUDED.value;
 	`
 
@@ -41,7 +44,7 @@ func (repository *MetricDBRepositoryImpl) Update(ctx context.Context, metricEnti
 		metricEntity.Value,
 	)
 	if err != nil {
-		log.Error().Err(err).Str("id", metricEntity.ID).Msg("Ошибка при сохранении метрики в PostgreSQL")
+		log.Error().Err(err).Str("name", metricEntity.ID).Msg("Ошибка при сохранении метрики в PostgreSQL")
 	}
 }
 
@@ -50,9 +53,9 @@ func (repository *MetricDBRepositoryImpl) Get(ctx context.Context, metricName st
 	log.Debug().Str("имя метрики", metricName).Msg("Запрос значения метрики из PostgreSQL")
 
 	query := `
-		SELECT id, mtype, delta, value
+		SELECT name, mtype, delta, value
 		FROM metrics
-		WHERE id = $1
+		WHERE name = $1
 		LIMIT 1;
 	`
 
@@ -65,10 +68,10 @@ func (repository *MetricDBRepositoryImpl) Get(ctx context.Context, metricName st
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Debug().Str("id", metricName).Msg("Такой метрики не существует в PostgreSQL")
+			log.Debug().Str("name", metricName).Msg("Такой метрики не существует в PostgreSQL")
 			return entity.MetricEntity{}, customerrors.ErrMetricNotFound
 		}
-		log.Error().Err(err).Str("id", metricName).Msg("Ошибка при чтении метрики из PostgreSQL")
+		log.Error().Err(err).Str("name", metricName).Msg("Ошибка при чтении метрики из PostgreSQL")
 		return entity.MetricEntity{}, err
 	}
 
@@ -79,7 +82,7 @@ func (repository *MetricDBRepositoryImpl) GetAll(ctx context.Context) map[string
 	log := logs.GetLoggerFromContext(ctx)
 	log.Debug().Msg("Получение всех метрик из PostgreSQL")
 
-	query := `SELECT id, mtype, delta, value FROM metrics;`
+	query := `SELECT name, mtype, delta, value FROM metrics;`
 
 	rows, err := repository.DB.Query(ctx, query)
 	if err != nil {
@@ -109,7 +112,7 @@ func (repository *MetricDBRepositoryImpl) Clean(ctx context.Context) {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Debug().Msg("Очищаем таблицу метрик в PostgreSQL")
 
-	if _, err := repository.DB.Exec(ctx, `TRUNCATE TABLE metrics;`); err != nil {
+	if _, err := repository.DB.Exec(ctx, `TRUNCATE TABLE metrics RESTART IDENTITY;`); err != nil {
 		log.Error().Err(err).Msg("Ошибка при очистке таблицы metrics")
 	}
 }

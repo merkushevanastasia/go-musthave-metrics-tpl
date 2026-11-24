@@ -1,7 +1,8 @@
 CREATE TABLE IF NOT EXISTS metrics (
-                                       id VARCHAR(255) NOT NULL,
+   id BIGSERIAL PRIMARY KEY,
+   name VARCHAR(255) NOT NULL,
     mtype VARCHAR(50) NOT NULL,
     delta BIGINT,
     value DOUBLE PRECISION,
-    PRIMARY KEY (id, mtype)
+    CONSTRAINT metrics_name_mtype_unique UNIQUE (name, mtype)
     );
