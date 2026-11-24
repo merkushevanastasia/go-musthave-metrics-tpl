@@ -43,3 +43,7 @@ func (m *MockMetricService) RestoreMetrics(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
+func (m *MockMetricService) UpdateMetricsBatch(ctx context.Context, dtos []dto.MetricDto) error {
+	args := m.Called(ctx, dtos)
+	return args.Error(0)
+}

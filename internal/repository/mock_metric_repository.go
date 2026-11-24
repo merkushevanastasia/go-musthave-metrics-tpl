@@ -48,3 +48,7 @@ func (m *MockMetricRepository) CreateDump(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
+func (m *MockMetricRepository) UpdateBatch(ctx context.Context, entities []entity.MetricEntity) error {
+	args := m.Called(ctx, entities)
+	return args.Error(0)
+}
