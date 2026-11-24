@@ -93,7 +93,6 @@ func collectSnapshot(values *dto.MetricCollection) []dto.MetricDto {
 		snapshot = append(snapshot, item)
 	}
 
-	// Сбрасываем счетчик обновлений под тем же мьютексом, чтобы исключить race condition
 	values.Add(toEntityCounter(constants.PollCount, 0))
 
 	return snapshot
@@ -148,7 +147,6 @@ func InitClient(config config.Config) {
 		SetHeader("Accept-Encoding", "gzip").
 		SetRetryCount(3).
 		SetRetryAfter(func(client *resty.Client, resp *resty.Response) (time.Duration, error) {
-			// resp.Request.Attempt начинается с 1 на первой повторной попытке
 			idx := resp.Request.Attempt - 1
 			if idx >= 0 && idx < len(delays) {
 				return delays[idx], nil

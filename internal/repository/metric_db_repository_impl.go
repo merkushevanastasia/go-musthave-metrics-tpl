@@ -41,7 +41,6 @@ func (repository *MetricDBRepositoryImpl) Update(ctx context.Context, metricEnti
 		ON CONFLICT (name, mtype) DO UPDATE SET
 			delta = CASE
 				WHEN EXCLUDED.mtype = 'counter' THEN COALESCE(metrics.delta, 0) + COALESCE(EXCLUDED.delta, 0)
-				ELSE NULL
 			END,
 			value = EXCLUDED.value;
 	`
@@ -180,7 +179,6 @@ func (repository *MetricDBRepositoryImpl) UpdateBatch(ctx context.Context, entit
 			ON CONFLICT (name, mtype) DO UPDATE SET
 				delta = CASE
 					WHEN EXCLUDED.mtype = 'counter' THEN COALESCE(metrics.delta, 0) + COALESCE(EXCLUDED.delta, 0)
-					ELSE NULL
 				END,
 				value = EXCLUDED.value;
 		`
