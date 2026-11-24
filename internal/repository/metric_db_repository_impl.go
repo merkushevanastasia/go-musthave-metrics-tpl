@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	customerrors "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/entity"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
@@ -141,34 +140,21 @@ func (repository *MetricDBRepositoryImpl) UpdateBatch(ctx context.Context, entit
 	}
 	defer tx.Rollback(ctx)
 
-	batch := &pgx.Batch{}
+	query := `
+		INSERT INTO metrics (name, mtype, delta, value)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (name, mtype) DO UPDATE SET
+			delta = CASE
+				WHEN EXCLUDED.mtype = 'counter' THEN COALESCE(metrics.delta, 0) + COALESCE(EXCLUDED.delta, 0)
+				ELSE NULL
+			END,
+			value = EXCLUDED.value;
+	`
+
 	for _, m := range entities {
-		switch m.MType {
-		case constants.CounterMetricType:
-			if m.Delta == nil {
-				continue
-			}
-			batch.Queue(`
-				INSERT INTO metrics (name, mtype, delta)
-				VALUES ($1, $2, $3)
-				ON CONFLICT (id) DO UPDATE SET delta = metrics.delta + EXCLUDED.delta
-			`, m.ID, m.MType, *m.Delta)
-
-		case constants.GaugeMetricType:
-			if m.Value == nil {
-				continue
-			}
-			batch.Queue(`
-				INSERT INTO metrics (name, mtype, value)
-				VALUES ($1, $2, $3)
-				ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value
-			`, m.ID, m.MType, *m.Value)
+		if _, err := tx.Exec(ctx, query, m.ID, m.MType, m.Delta, m.Value); err != nil {
+			return err
 		}
-	}
-
-	br := tx.SendBatch(ctx, batch)
-	if err := br.Close(); err != nil {
-		return err
 	}
 
 	return tx.Commit(ctx)
