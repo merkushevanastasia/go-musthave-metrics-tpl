@@ -165,3 +165,13 @@ func (repository *MetricFSRepositoryImpl) CreateDump(ctx context.Context) error 
 
 	return os.Rename(tmpName, repository.Config.FileStoragePath)
 }
+
+func (repository *MetricFSRepositoryImpl) UpdateBatch(ctx context.Context, entities []entity.MetricEntity) error {
+	repository.Storage.Mu.Lock()
+	defer repository.Storage.Mu.Unlock()
+
+	for _, item := range entities {
+		repository.Update(ctx, item)
+	}
+	return nil
+}

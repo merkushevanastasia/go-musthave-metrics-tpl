@@ -7,6 +7,7 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/mapper"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/entity"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 	"github.com/rs/zerolog/log"
 )
@@ -17,6 +18,7 @@ type MetricService interface {
 	GetAll(ctx context.Context) []dto.MetricDto
 	StartStoreTicker(ctx context.Context)
 	RestoreMetrics(ctx context.Context) error
+	UpdateMetricsBatch(ctx context.Context, dtoList []dto.MetricDto) error
 }
 type MetricServiceImpl struct {
 	repo repository.MetricRepository
@@ -65,6 +67,27 @@ func (s *MetricServiceImpl) GetAll(ctx context.Context) []dto.MetricDto {
 
 func (s *MetricServiceImpl) RestoreMetrics(ctx context.Context) error {
 	return s.repo.RestoreMetrics(ctx)
+}
+
+func (s *MetricServiceImpl) UpdateMetricsBatch(ctx context.Context, dtoList []dto.MetricDto) error {
+	if len(dtoList) == 0 {
+		return nil
+	}
+
+	entities := make([]entity.MetricEntity, 0, len(dtoList))
+	for _, d := range dtoList {
+		entities = append(entities, mapper.MapToEntity(d))
+	}
+
+	if err := s.repo.UpdateBatch(ctx, entities); err != nil {
+		return err
+	}
+
+	if s.conf.DatabaseDSN == "" && s.conf.StoreInterval == 0 && s.conf.FileStoragePath != "" {
+		return s.repo.CreateDump(ctx)
+	}
+
+	return nil
 }
 
 func (s *MetricServiceImpl) StartStoreTicker(ctx context.Context) {

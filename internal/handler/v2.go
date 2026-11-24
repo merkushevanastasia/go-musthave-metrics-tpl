@@ -69,6 +69,27 @@ func HandleMetricUpdateV2(metricService service.MetricService) gin.HandlerFunc {
 		c.Status(http.StatusOK)
 	}
 }
+func HandleMetricUpdatesBatch(metricService service.MetricService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var metrics []dto.MetricDto
+		if err := c.ShouldBindJSON(&metrics); err != nil {
+			c.String(http.StatusBadRequest, err.Error())
+			return
+		}
+
+		if len(metrics) == 0 {
+			c.Status(http.StatusOK)
+			return
+		}
+
+		if err := metricService.UpdateMetricsBatch(c.Request.Context(), metrics); err != nil {
+			handleError(c, err)
+			return
+		}
+
+		c.Status(http.StatusOK)
+	}
+}
 func HandleDBPing(dbPool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := logs.GetLoggerFromContext(c.Request.Context())

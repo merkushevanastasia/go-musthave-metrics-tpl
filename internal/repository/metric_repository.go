@@ -13,4 +13,5 @@ type MetricRepository interface {
 	Clean(ctx context.Context)
 	RestoreMetrics(ctx context.Context) error
 	CreateDump(ctx context.Context) error
+	UpdateBatch(ctx context.Context, entities []entity.MetricEntity) error
 }

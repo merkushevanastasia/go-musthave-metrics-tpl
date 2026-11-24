@@ -102,3 +102,13 @@ func (repository *MetricMemoryRepositoryImpl) RestoreMetrics(ctx context.Context
 	log.Info().Msg("Для данного репозитория метод RestoreMetrics пока не реализован")
 	return nil
 }
+
+func (repository *MetricMemoryRepositoryImpl) UpdateBatch(ctx context.Context, entities []entity.MetricEntity) error {
+	repository.Storage.Mu.Lock()
+	defer repository.Storage.Mu.Unlock()
+
+	for _, item := range entities {
+		repository.Update(ctx, item)
+	}
+	return nil
+}

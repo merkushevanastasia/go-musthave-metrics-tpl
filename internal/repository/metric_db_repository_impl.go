@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	customerrors "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/entity"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
@@ -127,4 +128,48 @@ func (repository *MetricDBRepositoryImpl) CreateDump(ctx context.Context) error 
 	log := logs.GetLoggerFromContext(ctx)
 	log.Info().Msg("Для PostgreSQL метод CreateDump не требуется")
 	return nil
+}
+
+func (repository *MetricDBRepositoryImpl) UpdateBatch(ctx context.Context, entities []entity.MetricEntity) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
+	tx, err := repository.DB.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	batch := &pgx.Batch{}
+	for _, m := range entities {
+		switch m.MType {
+		case constants.CounterMetricType:
+			if m.Delta == nil {
+				continue
+			}
+			batch.Queue(`
+				INSERT INTO metrics (name, mtype, delta)
+				VALUES ($1, $2, $3)
+				ON CONFLICT (id) DO UPDATE SET delta = metrics.delta + EXCLUDED.delta
+			`, m.ID, m.MType, *m.Delta)
+
+		case constants.GaugeMetricType:
+			if m.Value == nil {
+				continue
+			}
+			batch.Queue(`
+				INSERT INTO metrics (name, mtype, value)
+				VALUES ($1, $2, $3)
+				ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value
+			`, m.ID, m.MType, *m.Value)
+		}
+	}
+
+	br := tx.SendBatch(ctx, batch)
+	if err := br.Close(); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
