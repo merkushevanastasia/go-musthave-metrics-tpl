@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
@@ -136,13 +137,33 @@ func send(request dto.MetricDto) error {
 }
 
 func InitClient(config config.Config) {
+	delays := []time.Duration{
+		1 * time.Second,
+		3 * time.Second,
+		5 * time.Second,
+	}
+
 	metricServerClient = resty.New().
 		SetBaseURL(config.ServerURL).
-		SetHeader("Accept-Encoding", "gzip")
+		SetHeader("Accept-Encoding", "gzip").
+		SetRetryCount(3).
+		SetRetryAfter(func(client *resty.Client, resp *resty.Response) (time.Duration, error) {
+			// resp.Request.Attempt начинается с 1 на первой повторной попытке
+			idx := resp.Request.Attempt - 1
+			if idx >= 0 && idx < len(delays) {
+				return delays[idx], nil
+			}
+			return delays[len(delays)-1], nil
+		}).
+		AddRetryCondition(func(r *resty.Response, err error) bool {
+			return isRetriableNetworkError(r, err)
+		})
 
-	// Сжимаем тело исходящего JSON-запроса алгоритмом gzip
 	metricServerClient.OnBeforeRequest(func(c *resty.Client, r *resty.Request) error {
 		if r.Body == nil {
+			return nil
+		}
+		if _, alreadyCompressed := r.Body.([]byte); alreadyCompressed && r.Header.Get("Content-Encoding") == "gzip" {
 			return nil
 		}
 
@@ -165,4 +186,19 @@ func InitClient(config config.Config) {
 
 		return nil
 	})
+}
+func isRetriableNetworkError(r *resty.Response, err error) bool {
+
+	if err != nil {
+		return true
+	}
+
+	if r != nil {
+		switch r.StatusCode() {
+		case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+			return true
+		}
+	}
+
+	return false
 }
