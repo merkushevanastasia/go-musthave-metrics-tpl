@@ -56,7 +56,7 @@ func main() {
 			case <-collectTicker.C:
 				agent.Update(metrics)
 			case <-sendTicker.C:
-				agent.SendBatch(metrics)
+				agent.SendAll(metrics)
 			case <-ctx.Done():
 				return
 			}

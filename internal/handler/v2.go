@@ -77,6 +77,19 @@ func HandleMetricUpdatesBatch(metricService service.MetricService) gin.HandlerFu
 			return
 		}
 
+		for _, metricDto := range metrics {
+			err := validateMetricName(metricDto.ID)
+			if err != nil {
+				handleError(c, err)
+				return
+			}
+			err = validateMetricType(metricDto.MType)
+			if err != nil {
+				handleError(c, err)
+				return
+			}
+		}
+
 		if len(metrics) == 0 {
 			c.Status(http.StatusOK)
 			return

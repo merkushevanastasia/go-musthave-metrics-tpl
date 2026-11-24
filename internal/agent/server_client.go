@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"net/http"
 
 	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
@@ -15,7 +16,17 @@ import (
 
 var metricServerClient *resty.Client
 
-// SendBatch отправляет накопленные метрики одним батчем на POST /updates/
+type httpStatusError struct {
+	code   int
+	status string
+}
+
+func (e *httpStatusError) Error() string {
+	return fmt.Sprintf("вернулся ошибочный код: %s", e.status)
+}
+
+// SendBatch отправляет накопленные метрики батчем на POST /updates/.
+// Если сервер не поддерживает /updates/ (404/405), автоматически откатывается на поштучную отправку POST /update.
 func SendBatch(values *dto.MetricCollection) {
 	batch := collectSnapshot(values)
 	if len(batch) == 0 {
@@ -23,11 +34,20 @@ func SendBatch(values *dto.MetricCollection) {
 	}
 
 	log.Info().Int("count", len(batch)).Msg("Отправляем батч метрик на сервер...")
-	if err := sendBatch(batch); err != nil {
-		log.Error().Err(err).Msg("Произошла ошибка при отправке батча метрик")
+	err := sendBatch(batch)
+	if err == nil {
+		log.Info().Msg("Отправка батча метрик завершена")
 		return
 	}
-	log.Info().Msg("Отправка батча метрик завершена")
+
+	var statusErr *httpStatusError
+	if errors.As(err, &statusErr) && (statusErr.code == http.StatusNotFound || statusErr.code == http.StatusMethodNotAllowed) {
+		log.Warn().Msg("Эндпоинт /updates/ не поддерживается сервером, переключаемся на поштучную отправку /update")
+		sendSlice(batch)
+		return
+	}
+
+	log.Error().Err(err).Msg("Произошла ошибка при отправке батча метрик")
 }
 
 // SendAll отправляет метрики поштучно на POST /update (сохранено для обратной совместимости)
@@ -37,6 +57,10 @@ func SendAll(values *dto.MetricCollection) {
 		return
 	}
 
+	sendSlice(metrics)
+}
+
+func sendSlice(metrics []dto.MetricDto) {
 	log.Info().Msg("Отправляем метрики на сервер поштучно...")
 	for _, metric := range metrics {
 		if err := send(metric); err != nil {
@@ -86,7 +110,7 @@ func sendBatch(batch []dto.MetricDto) error {
 
 	if resp.IsError() {
 		log.Error().Str("status", resp.Status()).Msg("Сервер вернул ошибку при приеме батча")
-		return errors.New("вернулся ошибочный код: " + resp.Status())
+		return &httpStatusError{code: resp.StatusCode(), status: resp.Status()}
 	}
 
 	return nil
@@ -105,7 +129,7 @@ func send(request dto.MetricDto) error {
 
 	if resp.IsError() {
 		log.Error().Str("status", resp.Status()).Msg("Сервер вернул ошибку")
-		return errors.New("вернулся ошибочный код: " + resp.Status())
+		return &httpStatusError{code: resp.StatusCode(), status: resp.Status()}
 	}
 
 	return nil
