@@ -79,7 +79,11 @@ func HandleMetricUpdate(metricService service.MetricService) gin.HandlerFunc {
 			return
 		}
 
-		metricService.UpdateMetric(c.Request.Context(), gaugeDto)
+		err = metricService.UpdateMetric(c.Request.Context(), gaugeDto)
+		if err != nil {
+			handleError(c, err)
+			return
+		}
 
 		log.Info().Msg("Метрика успешно обработана")
 

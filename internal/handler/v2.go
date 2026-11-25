@@ -62,8 +62,11 @@ func HandleMetricUpdateV2(metricService service.MetricService) gin.HandlerFunc {
 			return
 		}
 
-		metricService.UpdateMetric(c.Request.Context(), &metricDto)
-
+		err = metricService.UpdateMetric(c.Request.Context(), &metricDto)
+		if err != nil {
+			handleError(c, err)
+			return
+		}
 		log.Info().Msg("Метрика успешно обработана")
 
 		c.Status(http.StatusOK)

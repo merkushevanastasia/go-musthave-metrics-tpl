@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"maps"
 	"sync"
 
@@ -29,45 +28,56 @@ func NewMetricMemoryRepositoryImpl() *MetricMemoryRepositoryImpl {
 	}
 }
 
-func (repository *MetricMemoryRepositoryImpl) Update(ctx context.Context, metricEntity entity.MetricEntity) {
-	log := logs.GetLoggerFromContext(ctx)
-
+func (repository *MetricMemoryRepositoryImpl) Update(ctx context.Context, metricEntity entity.MetricEntity) error {
 	repository.Storage.Mu.Lock()
 	defer repository.Storage.Mu.Unlock()
 
-	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик перед обновлением")
+	repository.update(ctx, metricEntity)
+	return nil
+}
+
+func (repository *MetricMemoryRepositoryImpl) update(ctx context.Context, metricEntity entity.MetricEntity) {
+	log := logs.GetLoggerFromContext(ctx)
+
+	log.Debug().
+		Str("id", metricEntity.ID).
+		Str("type", metricEntity.MType).
+		Msg("Обновление метрики в хранилище")
 
 	if metricEntity.MType == constants.CounterMetricType {
 		current, isPresent := repository.Storage.Metrics[metricEntity.ID]
 		if isPresent {
-			var newDelta int64 = 0
+			var newDelta int64
 			if current.Delta != nil {
-				newDelta = newDelta + *current.Delta
+				newDelta += *current.Delta
 			}
 			if metricEntity.Delta != nil {
-				newDelta = newDelta + *metricEntity.Delta
+				newDelta += *metricEntity.Delta
 			}
 			metricEntity.Delta = &newDelta
 		}
 	}
 	repository.Storage.Metrics[metricEntity.ID] = metricEntity
 
-	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик после обновления")
+	log.Debug().
+		Str("id", metricEntity.ID).
+		Int("total_metrics", len(repository.Storage.Metrics)).
+		Msg("Метрика обновлена в хранилище")
 }
 
 func (repository *MetricMemoryRepositoryImpl) Get(ctx context.Context, metricName string) (entity.MetricEntity, error) {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Debug().Str("имя метрики", metricName).Msg("Запрос значения метрики из хранилища")
-	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик ")
 
 	repository.Storage.Mu.RLock()
 	defer repository.Storage.Mu.RUnlock()
+
 	currentValue, isPresent := repository.Storage.Metrics[metricName]
 	if isPresent {
 		return currentValue, nil
 	}
 
-	log.Debug().Msg(fmt.Sprintf("Такой метрики не существует %s", metricName))
+	log.Debug().Str("имя метрики", metricName).Msg("Такой метрики не существует")
 	return currentValue, customerrors.ErrMetricNotFound
 }
 
@@ -97,6 +107,7 @@ func (repository *MetricMemoryRepositoryImpl) CreateDump(ctx context.Context) er
 	log.Info().Msg("Для данного репозитория метод CreateDump не реализован")
 	return nil
 }
+
 func (repository *MetricMemoryRepositoryImpl) RestoreMetrics(ctx context.Context) error {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Info().Msg("Для данного репозитория метод RestoreMetrics пока не реализован")
@@ -104,11 +115,15 @@ func (repository *MetricMemoryRepositoryImpl) RestoreMetrics(ctx context.Context
 }
 
 func (repository *MetricMemoryRepositoryImpl) UpdateBatch(ctx context.Context, entities []entity.MetricEntity) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
 	repository.Storage.Mu.Lock()
 	defer repository.Storage.Mu.Unlock()
 
 	for _, item := range entities {
-		repository.Update(ctx, item)
+		repository.update(ctx, item)
 	}
 	return nil
 }

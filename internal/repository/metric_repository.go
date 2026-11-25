@@ -7,7 +7,7 @@ import (
 )
 
 type MetricRepository interface {
-	Update(ctx context.Context, entity entity.MetricEntity)
+	Update(ctx context.Context, entity entity.MetricEntity) error
 	Get(ctx context.Context, metricName string) (entity.MetricEntity, error)
 	GetAll(ctx context.Context) map[string]entity.MetricEntity
 	Clean(ctx context.Context)

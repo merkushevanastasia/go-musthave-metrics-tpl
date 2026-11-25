@@ -32,7 +32,7 @@ func NewMetricDBRepositoryImpl(dbPool *pgxpool.Pool) *MetricDBRepositoryImpl {
 	}
 }
 
-func (repository *MetricDBRepositoryImpl) Update(ctx context.Context, metricEntity entity.MetricEntity) {
+func (repository *MetricDBRepositoryImpl) Update(ctx context.Context, metricEntity entity.MetricEntity) error {
 	log := logs.GetLoggerFromContext(ctx)
 
 	query := `
@@ -59,7 +59,9 @@ func (repository *MetricDBRepositoryImpl) Update(ctx context.Context, metricEnti
 
 	if err != nil {
 		log.Error().Err(err).Str("name", metricEntity.ID).Msg("Ошибка при сохранении метрики в PostgreSQL")
+		return err
 	}
+	return nil
 }
 
 func (repository *MetricDBRepositoryImpl) Get(ctx context.Context, metricName string) (entity.MetricEntity, error) {

@@ -13,7 +13,7 @@ import (
 )
 
 type MetricService interface {
-	UpdateMetric(ctx context.Context, dto *dto.MetricDto)
+	UpdateMetric(ctx context.Context, dto *dto.MetricDto) error
 	GetMetric(ctx context.Context, metricName string) (dto.MetricDto, error)
 	GetAll(ctx context.Context) []dto.MetricDto
 	StartStoreTicker(ctx context.Context)
@@ -32,15 +32,19 @@ func NewMetricServiceImpl(repo repository.MetricRepository, config server.Config
 	}
 }
 
-func (s *MetricServiceImpl) UpdateMetric(ctx context.Context, dto *dto.MetricDto) {
+func (s *MetricServiceImpl) UpdateMetric(ctx context.Context, dto *dto.MetricDto) error {
 	entity := mapper.MapToEntity(*dto)
-	s.repo.Update(ctx, entity)
+	err := s.repo.Update(ctx, entity)
+	if err != nil {
+		return err
+	}
 	if s.conf.StoreInterval == 0 {
 		err := s.repo.CreateDump(ctx)
 		if err != nil {
 			log.Err(err)
 		}
 	}
+	return nil
 }
 
 func (s *MetricServiceImpl) GetMetric(ctx context.Context, metricName string) (dto.MetricDto, error) {

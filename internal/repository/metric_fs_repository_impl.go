@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -30,45 +29,56 @@ func NewMetricFSRepositoryImpl(config server.Config) *MetricFSRepositoryImpl {
 	}
 }
 
-func (repository *MetricFSRepositoryImpl) Update(ctx context.Context, metricEntity entity.MetricEntity) {
-	log := logs.GetLoggerFromContext(ctx)
-
+func (repository *MetricFSRepositoryImpl) Update(ctx context.Context, metricEntity entity.MetricEntity) error {
 	repository.Storage.Mu.Lock()
 	defer repository.Storage.Mu.Unlock()
 
-	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик перед обновлением")
+	repository.update(ctx, metricEntity)
+	return nil
+}
+
+func (repository *MetricFSRepositoryImpl) update(ctx context.Context, metricEntity entity.MetricEntity) {
+	log := logs.GetLoggerFromContext(ctx)
+
+	log.Debug().
+		Str("id", metricEntity.ID).
+		Str("type", metricEntity.MType).
+		Msg("Обновление метрики в хранилище")
 
 	if metricEntity.MType == constants.CounterMetricType {
 		current, isPresent := repository.Storage.Metrics[metricEntity.ID]
 		if isPresent {
-			var newDelta int64 = 0
+			var newDelta int64
 			if current.Delta != nil {
-				newDelta = newDelta + *current.Delta
+				newDelta += *current.Delta
 			}
 			if metricEntity.Delta != nil {
-				newDelta = newDelta + *metricEntity.Delta
+				newDelta += *metricEntity.Delta
 			}
 			metricEntity.Delta = &newDelta
 		}
 	}
 	repository.Storage.Metrics[metricEntity.ID] = metricEntity
 
-	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик после обновления")
+	log.Debug().
+		Str("id", metricEntity.ID).
+		Int("total_metrics", len(repository.Storage.Metrics)).
+		Msg("Метрика обновлена в хранилище")
 }
 
 func (repository *MetricFSRepositoryImpl) Get(ctx context.Context, metricName string) (entity.MetricEntity, error) {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Debug().Str("имя метрики", metricName).Msg("Запрос значения метрики из хранилища")
-	log.Debug().Any("memStorage", &repository.Storage).Msg("Хранилище метрик ")
 
 	repository.Storage.Mu.RLock()
 	defer repository.Storage.Mu.RUnlock()
+
 	currentValue, isPresent := repository.Storage.Metrics[metricName]
 	if isPresent {
 		return currentValue, nil
 	}
 
-	log.Debug().Msg(fmt.Sprintf("Такой метрики не существует %s", metricName))
+	log.Debug().Str("имя метрики", metricName).Msg("Такой метрики не существует")
 	return currentValue, customerrors.ErrMetricNotFound
 }
 
@@ -119,14 +129,18 @@ func (repository *MetricFSRepositoryImpl) RestoreMetrics(ctx context.Context) er
 		return err
 	}
 
-	log.Debug().Any("Содержимое файла", items).Msg("Содержимое")
+	log.Debug().Int("count", len(items)).Msg("Метрики прочитаны из файла")
 
-	repository.Clean(ctx)
+	repository.Storage.Mu.Lock()
+	defer repository.Storage.Mu.Unlock()
+
+	repository.Storage.Metrics = make(map[string]entity.MetricEntity, len(items))
 	for _, item := range items {
-		repository.Update(ctx, item)
+		repository.update(ctx, item)
 	}
 	return nil
 }
+
 func (repository *MetricFSRepositoryImpl) CreateDump(ctx context.Context) error {
 	log := logs.GetLoggerFromContext(ctx)
 	log.Info().Msg("Создаём дамп")
@@ -167,11 +181,15 @@ func (repository *MetricFSRepositoryImpl) CreateDump(ctx context.Context) error 
 }
 
 func (repository *MetricFSRepositoryImpl) UpdateBatch(ctx context.Context, entities []entity.MetricEntity) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
 	repository.Storage.Mu.Lock()
 	defer repository.Storage.Mu.Unlock()
 
 	for _, item := range entities {
-		repository.Update(ctx, item)
+		repository.update(ctx, item)
 	}
 	return nil
 }
