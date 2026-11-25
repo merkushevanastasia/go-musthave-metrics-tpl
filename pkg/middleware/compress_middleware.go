@@ -51,7 +51,7 @@ func CompressMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		if isNeedResultCompress(resMulti) {
+		if isNeedResultCompress(ctx, resMulti) {
 			resMulti.Header().Set("Content-Encoding", "gzip")
 			resMulti.Header().Add("Vary", "Accept-Encoding")
 			compressBytes, err := compressBytes(resMulti.BodyResponse)
@@ -69,7 +69,12 @@ func CompressMiddleware() gin.HandlerFunc {
 }
 
 // Нужно ли сжимать ответ
-func isNeedResultCompress(resMulti *requestresponse.ResponseMultiple) bool {
+func isNeedResultCompress(ctx *gin.Context, resMulti *requestresponse.ResponseMultiple) bool {
+	acceptEncoding := ctx.GetHeader("Accept-Encoding")
+	supportsGzip := strings.Contains(acceptEncoding, "gzip")
+	if !supportsGzip {
+		return false
+	}
 	contentType := resMulti.Header().Get("Content-Type")
 	return strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")
 }
