@@ -120,6 +120,16 @@ func HandleDBPing(dbPool *pgxpool.Pool) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 		defer cancel()
 
+		start := time.Now()
+		stat := dbPool.Stat()
+		log.Debug().
+			Dur("ping_duration", time.Since(start)).
+			Int32("acquired_conns", stat.AcquiredConns()).          // занятые сейчас
+			Int32("idle_conns", stat.IdleConns()).                  // свободные в пуле
+			Int32("total_conns", stat.TotalConns()).                // всего открыто
+			Int32("max_conns", stat.MaxConns()).                    // лимит пула
+			Int64("empty_acquire_count", stat.EmptyAcquireCount()). // сколько раз ждали свободное соединение
+			Msg("Статистика пула PostgreSQL при проверке ping")
 		if err := dbPool.Ping(ctx); err != nil {
 			c.Status(http.StatusInternalServerError)
 			return

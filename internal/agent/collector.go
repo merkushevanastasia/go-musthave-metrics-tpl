@@ -14,7 +14,6 @@ func Update(metricCollection *dto.MetricCollection) {
 	metricCollection.Mu.Lock()
 	defer metricCollection.Mu.Unlock()
 
-	log.Debug().Any("До обновления ", metricCollection.Metrics).Msg("Запускаем процесс сбора метрик.")
 	log.Info().Msg("Собираем метрики...")
 
 	var m runtime.MemStats
@@ -51,7 +50,6 @@ func Update(metricCollection *dto.MetricCollection) {
 
 	metricCollection.Add(toEntityCounter(constants.PollCount, metricCollection.GetCurrent(constants.PollCount)+1))
 
-	log.Debug().Any("После обновления ", metricCollection.Metrics).Msg("Собрали и обновили метрики.")
 	log.Info().Msg("Собрали и обновили метрики.")
 }
 
