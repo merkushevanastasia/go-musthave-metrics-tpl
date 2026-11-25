@@ -2,6 +2,7 @@ package agent
 
 import (
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -117,7 +118,7 @@ func TestSendAllSuccess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			SendAll(tt.args.values)
+			SendAll(context.Background(), tt.args.values)
 			assert.ElementsMatch(t, tt.args.expectedPaths, actualUrls)
 			assert.ElementsMatch(t, tt.args.expectedBodys, actualBodys)
 		})

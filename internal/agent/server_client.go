@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -24,51 +25,6 @@ type httpStatusError struct {
 
 func (e *httpStatusError) Error() string {
 	return fmt.Sprintf("вернулся ошибочный код: %s", e.status)
-}
-
-// SendBatch отправляет накопленные метрики батчем на POST /updates/.
-// Если сервер не поддерживает /updates/ (404/405), автоматически откатывается на поштучную отправку POST /update.
-func SendBatch(values *dto.MetricCollection) {
-	batch := collectSnapshot(values)
-	if len(batch) == 0 {
-		return
-	}
-
-	log.Info().Int("count", len(batch)).Msg("Отправляем батч метрик на сервер...")
-	err := sendBatch(batch)
-	if err == nil {
-		log.Info().Msg("Отправка батча метрик завершена")
-		return
-	}
-
-	var statusErr *httpStatusError
-	if errors.As(err, &statusErr) && (statusErr.code == http.StatusNotFound || statusErr.code == http.StatusMethodNotAllowed) {
-		log.Warn().Msg("Эндпоинт /updates/ не поддерживается сервером, переключаемся на поштучную отправку /update")
-		sendSlice(batch)
-		return
-	}
-
-	log.Error().Err(err).Msg("Произошла ошибка при отправке батча метрик")
-}
-
-// SendAll отправляет метрики поштучно на POST /update (сохранено для обратной совместимости)
-func SendAll(values *dto.MetricCollection) {
-	metrics := collectSnapshot(values)
-	if len(metrics) == 0 {
-		return
-	}
-
-	sendSlice(metrics)
-}
-
-func sendSlice(metrics []dto.MetricDto) {
-	log.Info().Msg("Отправляем метрики на сервер поштучно...")
-	for _, metric := range metrics {
-		if err := send(metric); err != nil {
-			log.Error().Err(err).Str("metric", metric.ID).Msg("Произошла ошибка при отправке метрики")
-		}
-	}
-	log.Info().Msg("Отправка метрик на сервер завершена")
 }
 
 func collectSnapshot(values *dto.MetricCollection) []dto.MetricDto {
@@ -98,8 +54,64 @@ func collectSnapshot(values *dto.MetricCollection) []dto.MetricDto {
 	return snapshot
 }
 
-func sendBatch(batch []dto.MetricDto) error {
+// SendBatch отправляет накопленные метрики батчем на POST /updates/.
+func SendBatch(ctx context.Context, values *dto.MetricCollection) {
+	batch := collectSnapshot(values)
+	if len(batch) == 0 {
+		return
+	}
+
+	log.Info().Int("count", len(batch)).Msg("Отправляем батч метрик на сервер...")
+	err := sendBatch(ctx, batch)
+	if err == nil {
+		log.Info().Msg("Отправка батча метрик завершена")
+		return
+	}
+
+	if errors.Is(err, context.Canceled) {
+		return
+	}
+
+	var statusErr *httpStatusError
+	if errors.As(err, &statusErr) && (statusErr.code == http.StatusNotFound || statusErr.code == http.StatusMethodNotAllowed) {
+		log.Warn().Msg("Эндпоинт /updates/ не поддерживается сервером, переключаемся на поштучную отправку /update")
+		sendSlice(ctx, batch)
+		return
+	}
+
+	log.Error().Err(err).Msg("Произошла ошибка при отправке батча метрик")
+}
+
+// SendAll отправляет метрики поштучно на POST /update
+func SendAll(ctx context.Context, values *dto.MetricCollection) {
+	metrics := collectSnapshot(values)
+	if len(metrics) == 0 {
+		return
+	}
+
+	sendSlice(ctx, metrics)
+}
+
+func sendSlice(ctx context.Context, metrics []dto.MetricDto) {
+	log.Info().Msg("Отправляем метрики на сервер поштучно...")
+	for _, metric := range metrics {
+		if ctx.Err() != nil {
+			log.Info().Msg("Отправка метрик прервана по отмене контекста")
+			return
+		}
+		if err := send(ctx, metric); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+			log.Error().Err(err).Str("metric", metric.ID).Msg("Произошла ошибка при отправке метрики")
+		}
+	}
+	log.Info().Msg("Отправка метрик на сервер завершена")
+}
+
+func sendBatch(ctx context.Context, batch []dto.MetricDto) error {
 	resp, err := metricServerClient.R().
+		SetContext(ctx).
 		SetHeader("Content-Type", "application/json").
 		SetBody(batch).
 		Post("/updates/")
@@ -116,9 +128,10 @@ func sendBatch(batch []dto.MetricDto) error {
 	return nil
 }
 
-func send(request dto.MetricDto) error {
+func send(ctx context.Context, request dto.MetricDto) error {
 	log.Debug().Str("metric", request.ID).Msg("Отправляется метрика")
 	resp, err := metricServerClient.R().
+		SetContext(ctx).
 		SetHeader("Content-Type", "application/json").
 		SetBody(request).
 		Post("/update")
@@ -188,6 +201,9 @@ func InitClient(config config.Config) {
 func isRetriableNetworkError(r *resty.Response, err error) bool {
 
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return false
+		}
 		return true
 	}
 
