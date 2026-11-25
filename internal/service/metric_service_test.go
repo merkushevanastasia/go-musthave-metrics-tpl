@@ -36,7 +36,7 @@ func TestMetricServiceUpdateMetric(t *testing.T) {
 			mockRepo := new(repository.MockMetricRepository)
 			s := NewMetricServiceImpl(mockRepo, server.Config{StoreInterval: 100000, Restore: false, FileStoragePath: "/tmp"})
 			entity := mapper.MapToEntity(tt.inputDto)
-			mockRepo.On("Update", ctx, entity).Return().Once()
+			mockRepo.On("Update", ctx, entity).Return(nil).Once()
 			s.UpdateMetric(ctx, &tt.inputDto)
 			mockRepo.AssertExpectations(t)
 		})
