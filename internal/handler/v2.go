@@ -1,25 +1,29 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils/logging"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func HandleMetricGetV2(metricService service.MetricService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		log := logging.FromContext(c.Request.Context())
+		log := logs.GetLoggerFromContext(c)
 
 		metricRequest, err := parseMetricDtoV2(c)
 		if err != nil {
 			handleError(c, err)
 			return
 		}
+		log.Info().Msg("Поступил запрос на получение метрики...")
 
 		metric, err := metricService.GetMetric(c.Request.Context(), metricRequest.ID)
 
@@ -37,7 +41,7 @@ func HandleMetricGetV2(metricService service.MetricService) gin.HandlerFunc {
 
 func HandleMetricUpdateV2(metricService service.MetricService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		log := logging.FromContext(c.Request.Context())
+		log := logs.GetLoggerFromContext(c.Request.Context())
 
 		log.Info().Msg("Поступил запрос на обработку метрики...")
 
@@ -58,9 +62,82 @@ func HandleMetricUpdateV2(metricService service.MetricService) gin.HandlerFunc {
 			return
 		}
 
-		metricService.UpdateMetric(c.Request.Context(), &metricDto)
-
+		err = metricService.UpdateMetric(c.Request.Context(), &metricDto)
+		if err != nil {
+			handleError(c, err)
+			return
+		}
 		log.Info().Msg("Метрика успешно обработана")
+
+		c.Status(http.StatusOK)
+	}
+}
+func HandleMetricUpdatesBatch(metricService service.MetricService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var metrics []dto.MetricDto
+		if err := c.ShouldBindJSON(&metrics); err != nil {
+			c.String(http.StatusBadRequest, err.Error())
+			return
+		}
+
+		for _, metricDto := range metrics {
+			err := validateMetricName(metricDto.ID)
+			if err != nil {
+				handleError(c, err)
+				return
+			}
+			err = validateMetricType(metricDto.MType)
+			if err != nil {
+				handleError(c, err)
+				return
+			}
+		}
+
+		if len(metrics) == 0 {
+			c.Status(http.StatusOK)
+			return
+		}
+
+		if err := metricService.UpdateMetricsBatch(c.Request.Context(), metrics); err != nil {
+			handleError(c, err)
+			return
+		}
+
+		c.Status(http.StatusOK)
+	}
+}
+func HandleDBPing(dbPool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := logs.GetLoggerFromContext(c.Request.Context())
+
+		log.Info().Msg("Поступил запрос на проверку соединения с БД...")
+
+		if dbPool == nil {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		defer cancel()
+
+		start := time.Now()
+		stat := dbPool.Stat()
+		log.Debug().
+			Dur("ping_duration", time.Since(start)).
+			Int32("acquired_conns", stat.AcquiredConns()).          // занятые сейчас
+			Int32("idle_conns", stat.IdleConns()).                  // свободные в пуле
+			Int32("total_conns", stat.TotalConns()).                // всего открыто
+			Int32("max_conns", stat.MaxConns()).                    // лимит пула
+			Int64("empty_acquire_count", stat.EmptyAcquireCount()). // сколько раз ждали свободное соединение
+			Msg("Статистика пула PostgreSQL при проверке ping")
+		if err := dbPool.Ping(ctx); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		c.Status(http.StatusOK)
+
+		log.Info().Msg("Запрос успешно обработан")
 
 		c.Status(http.StatusOK)
 	}

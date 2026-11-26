@@ -2,23 +2,23 @@ package service
 
 import (
 	"context"
-	"encoding/json"
-	"os"
 	"time"
 
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/server"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/mapper"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/entity"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 	"github.com/rs/zerolog/log"
 )
 
 type MetricService interface {
-	UpdateMetric(ctx context.Context, dto *dto.MetricDto)
+	UpdateMetric(ctx context.Context, dto *dto.MetricDto) error
 	GetMetric(ctx context.Context, metricName string) (dto.MetricDto, error)
 	GetAll(ctx context.Context) []dto.MetricDto
 	StartStoreTicker(ctx context.Context)
-	RestoreMetrics() error
+	RestoreMetrics(ctx context.Context) error
+	UpdateMetricsBatch(ctx context.Context, dtoList []dto.MetricDto) error
 }
 type MetricServiceImpl struct {
 	repo repository.MetricRepository
@@ -32,15 +32,19 @@ func NewMetricServiceImpl(repo repository.MetricRepository, config server.Config
 	}
 }
 
-func (s *MetricServiceImpl) UpdateMetric(ctx context.Context, dto *dto.MetricDto) {
+func (s *MetricServiceImpl) UpdateMetric(ctx context.Context, dto *dto.MetricDto) error {
 	entity := mapper.MapToEntity(*dto)
-	s.repo.Update(ctx, entity)
+	err := s.repo.Update(ctx, entity)
+	if err != nil {
+		return err
+	}
 	if s.conf.StoreInterval == 0 {
-		err := s.saveMetricsInFile()
+		err := s.repo.CreateDump(ctx)
 		if err != nil {
 			log.Err(err)
 		}
 	}
+	return nil
 }
 
 func (s *MetricServiceImpl) GetMetric(ctx context.Context, metricName string) (dto.MetricDto, error) {
@@ -65,82 +69,48 @@ func (s *MetricServiceImpl) GetAll(ctx context.Context) []dto.MetricDto {
 	return result
 }
 
-func (s *MetricServiceImpl) saveMetricsInFile() error {
-	if s.conf.FileStoragePath == "" {
-		return nil
-	}
-
-	metricsMap := s.GetAll(context.Background())
-
-	var items []dto.MetricDto
-	items = append(items, metricsMap...)
-
-	data, err := json.MarshalIndent(items, "", "  ")
-	if err != nil {
-		return err
-	}
-	file, err := os.OpenFile(s.conf.FileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.Write(data)
-	return err
+func (s *MetricServiceImpl) RestoreMetrics(ctx context.Context) error {
+	return s.repo.RestoreMetrics(ctx)
 }
 
-func (s *MetricServiceImpl) RestoreMetrics() error {
-
-	if !s.conf.Restore {
+func (s *MetricServiceImpl) UpdateMetricsBatch(ctx context.Context, dtoList []dto.MetricDto) error {
+	if len(dtoList) == 0 {
 		return nil
 	}
-	log.Info().Msg("Начинаем восстановление из файла" + s.conf.FileStoragePath)
 
-	data, err := os.ReadFile(s.conf.FileStoragePath)
-	if os.IsNotExist(err) {
-		log.Info().Msg("Файл хранения метрик отсутствует, загрузка пропущена")
-		return nil
+	entities := make([]entity.MetricEntity, 0, len(dtoList))
+	for _, d := range dtoList {
+		entities = append(entities, mapper.MapToEntity(d))
 	}
-	if err != nil {
+
+	if err := s.repo.UpdateBatch(ctx, entities); err != nil {
 		return err
 	}
 
-	var items []dto.MetricDto
-	if err := json.Unmarshal(data, &items); err != nil {
-		return err
+	if s.conf.DatabaseDSN == "" && s.conf.StoreInterval == 0 && s.conf.FileStoragePath != "" {
+		return s.repo.CreateDump(ctx)
 	}
 
-	log.Info().Any("Содержимое файла", items).Msg("Содержимое")
-
-	s.repo.Clean(context.Background())
-	for _, item := range items {
-		s.UpdateMetric(context.Background(), &item)
-	}
 	return nil
 }
 
 func (s *MetricServiceImpl) StartStoreTicker(ctx context.Context) {
-	if s.conf.StoreInterval > 0 && s.conf.FileStoragePath != "" {
-		go func() {
-			ticker := time.NewTicker(time.Duration(s.conf.StoreInterval) * time.Second)
-			defer ticker.Stop()
+	go func() {
+		ticker := time.NewTicker(time.Duration(s.conf.StoreInterval) * time.Second)
+		defer ticker.Stop()
 
-			log.Info().Msg("Запущен тикер сохранения метрик в файл")
+		log.Info().Msg("Запущен тикер сохранения метрик в файл")
 
-			for {
-				select {
-				case <-ticker.C:
-					if err := s.saveMetricsInFile(); err != nil {
-						log.Error().Err(err).Msg("Ошибка при периодическом сохранении метрик")
-					}
-				case <-ctx.Done():
-					log.Info().Msg("Контекст отменен, останавливаем тикер сохранения метрик")
-					if err := s.saveMetricsInFile(); err != nil {
-						log.Error().Err(err).Msg("Ошибка при финальном сохранении метрик перед выходом")
-					}
-					return
+		for {
+			select {
+			case <-ticker.C:
+				if err := s.repo.CreateDump(ctx); err != nil {
+					log.Error().Err(err).Msg("Ошибка при периодическом сохранении метрик")
 				}
+			case <-ctx.Done():
+				log.Info().Msg("Контекст отменен, останавливаем тикер сохранения метрик")
+				return
 			}
-		}()
-	}
+		}
+	}()
 }

@@ -8,26 +8,32 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	servererror "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/error"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/service"
-	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/utils/logging"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/logs"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func SetUpRoutes(router *gin.Engine, metricService service.MetricService) {
+func SetUpRoutes(router *gin.Engine, metricService service.MetricService, dbPool *pgxpool.Pool) {
 
 	pathUpdate := fmt.Sprintf("/update/:%s/:%s/:%s", constants.MetricTypePathKey, constants.MetricNamePathKey, constants.MetricValuePathKey)
 	pathGet := fmt.Sprintf("/value/:%s/:%s", constants.MetricTypePathKey, constants.MetricNamePathKey)
 
-	router.POST(pathUpdate, HandleMetricUpdate(metricService))
-	router.GET(pathGet, HandleMetricGetV1(metricService))
-	router.GET("/", HandleMetricGetAll(metricService))
 	router.POST("/value", HandleMetricGetV2(metricService))
 	router.POST("/value/", HandleMetricGetV2(metricService))
 	router.POST("/update", HandleMetricUpdateV2(metricService))
+	router.POST("/update/", HandleMetricUpdateV2(metricService))
+	router.POST("/updates", HandleMetricUpdatesBatch(metricService))
+	router.POST("/updates/", HandleMetricUpdatesBatch(metricService))
+
+	router.POST(pathUpdate, HandleMetricUpdate(metricService))
+	router.GET(pathGet, HandleMetricGetV1(metricService))
+	router.GET("/", HandleMetricGetAll(metricService))
+	router.GET("/ping", HandleDBPing(dbPool))
 }
 
 // handleError маппинг кастомной ошибки в ожидаемый ответ
 func handleError(c *gin.Context, err error) {
-	logger := logging.FromContext(c.Request.Context())
+	logger := logs.GetLoggerFromContext(c.Request.Context())
 
 	if err != nil {
 		logger.Error().Msg(err.Error())

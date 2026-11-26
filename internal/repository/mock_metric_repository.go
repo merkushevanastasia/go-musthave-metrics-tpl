@@ -13,8 +13,10 @@ type MockMetricRepository struct {
 }
 
 // Update имитирует обновление метрики в репозитории
-func (m *MockMetricRepository) Update(ctx context.Context, entity entity.MetricEntity) {
-	m.Called(ctx, entity)
+func (m *MockMetricRepository) Update(ctx context.Context, entity entity.MetricEntity) error {
+	args := m.Called(ctx, entity)
+	return args.Error(0)
+
 }
 
 // Get GetMetric Get имитирует получение метрики по имени
@@ -38,4 +40,17 @@ func (m *MockMetricRepository) GetAll(ctx context.Context) map[string]entity.Met
 
 func (m *MockMetricRepository) Clean(ctx context.Context) {
 	m.Called(ctx)
+}
+func (m *MockMetricRepository) RestoreMetrics(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockMetricRepository) CreateDump(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+func (m *MockMetricRepository) UpdateBatch(ctx context.Context, entities []entity.MetricEntity) error {
+	args := m.Called(ctx, entities)
+	return args.Error(0)
 }

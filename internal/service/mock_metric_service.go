@@ -12,8 +12,9 @@ type MockMetricService struct {
 }
 
 // UpdateMetric имитирует обновление метрики
-func (m *MockMetricService) UpdateMetric(ctx context.Context, dto *dto.MetricDto) {
-	m.Called(ctx, dto)
+func (m *MockMetricService) UpdateMetric(ctx context.Context, dto *dto.MetricDto) error {
+	args := m.Called(ctx, dto)
+	return args.Error(0)
 }
 
 // GetMetric имитирует получение метрики
@@ -39,7 +40,11 @@ func (m *MockMetricService) StartStoreTicker(ctx context.Context) {
 }
 
 // RestoreMetrics имитирует восстановление метрик при старте
-func (m *MockMetricService) RestoreMetrics() error {
-	args := m.Called()
+func (m *MockMetricService) RestoreMetrics(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+func (m *MockMetricService) UpdateMetricsBatch(ctx context.Context, dtos []dto.MetricDto) error {
+	args := m.Called(ctx, dtos)
 	return args.Error(0)
 }
