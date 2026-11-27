@@ -62,8 +62,8 @@ func run() {
 	router := gin.New()
 	router.Use(middleware.LoggingRequestResponseCommonMiddleware())
 	router.Use(middleware.MultipleReadMiddleware())
-	router.Use(middleware.SignMiddleware(conf.CryptoKey))
 	router.Use(middleware.CompressMiddleware())
+	router.Use(middleware.SignMiddleware(conf.CryptoKey))
 	router.Use(middleware.LoggingDetailsMiddleware())
 	router.Use(gin.Recovery())
 
