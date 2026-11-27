@@ -47,6 +47,7 @@ func run() {
 	flag.StringVar(&conf.FileStoragePath, "f", "", "file storage path")
 	flag.BoolVar(&conf.Restore, "r", false, "restore previous values from file")
 	flag.StringVar(&conf.DatabaseDSN, "d", "", "database connection string")
+	flag.StringVar(&conf.CryptoKey, "k", "", "crypto key")
 	flag.Parse()
 	if err := env.Parse(&conf); err != nil {
 		log.Printf("failed to parse env variables: %v", err)
@@ -61,6 +62,7 @@ func run() {
 	router := gin.New()
 	router.Use(middleware.LoggingRequestResponseCommonMiddleware())
 	router.Use(middleware.MultipleReadMiddleware())
+	router.Use(middleware.SignMiddleware(conf.CryptoKey))
 	router.Use(middleware.CompressMiddleware())
 	router.Use(middleware.LoggingDetailsMiddleware())
 	router.Use(gin.Recovery())
