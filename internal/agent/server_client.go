@@ -12,6 +12,7 @@ import (
 	config "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/config/agent"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/constants"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model/dto"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/pkg/utils"
 	"github.com/go-resty/resty/v2"
 	"github.com/rs/zerolog/log"
 )
@@ -174,13 +175,26 @@ func InitClient(config config.Config) {
 		if r.Body == nil {
 			return nil
 		}
-		if _, alreadyCompressed := r.Body.([]byte); alreadyCompressed && r.Header.Get("Content-Encoding") == "gzip" {
+		// Защита от повторного сжатия при retry
+		if r.Header.Get("Content-Encoding") == "gzip" {
 			return nil
 		}
 
-		bodyBytes, err := c.JSONMarshal(r.Body)
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON before gzip: %w", err)
+		var bodyBytes []byte
+		if raw, ok := r.Body.([]byte); ok {
+			bodyBytes = raw
+		} else {
+			var err error
+			bodyBytes, err = c.JSONMarshal(r.Body)
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+		}
+
+		// Считаем подпись от несжатых байтов JSON
+		if config.CryptoKey != "" {
+			signature := utils.Sign(bodyBytes, config.CryptoKey)
+			r.SetHeader(utils.AlgSignHeader, signature)
 		}
 
 		var buf bytes.Buffer
@@ -198,6 +212,7 @@ func InitClient(config config.Config) {
 		return nil
 	})
 }
+
 func isRetriableNetworkError(r *resty.Response, err error) bool {
 
 	if err != nil {

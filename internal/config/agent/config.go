@@ -5,4 +5,5 @@ type Config struct {
 	ReportInterval int    `env:"REPORT_INTERVAL"`
 	ServerURL      string `env:"ADDRESS"`
 	LogLevel       string
+	CryptoKey      string `env:"KEY"`
 }

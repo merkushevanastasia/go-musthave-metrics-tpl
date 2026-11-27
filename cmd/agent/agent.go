@@ -27,6 +27,7 @@ func main() {
 	flag.StringVar(&conf.ServerURL, "a", "localhost:8080", "server url")
 	flag.IntVar(&conf.ReportInterval, "r", 10, "report interval")
 	flag.IntVar(&conf.PollInterval, "p", 2, "poll interval")
+	flag.StringVar(&conf.CryptoKey, "k", "", "crypto key")
 	flag.Parse()
 
 	if err := env.Parse(&conf); err != nil {
