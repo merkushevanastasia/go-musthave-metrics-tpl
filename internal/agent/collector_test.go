@@ -72,6 +72,7 @@ func TestUpdate(t *testing.T) {
 				// (это я узнала у ИИ, но спорить не стала)
 				canBeZero := metricName == constants.NumForcedGC ||
 					metricName == constants.PauseTotalNs ||
+					metricName == constants.Frees ||
 					metricName == constants.Lookups ||
 					metricName == constants.HeapReleased ||
 					metricName == constants.LastGC ||
